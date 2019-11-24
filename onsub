@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+import onsub
+if __name__ == "__main__":
+    onsub.main()
+    pass
