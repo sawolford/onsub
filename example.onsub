@@ -1,0 +1,18 @@
+default = {
+    "cwd": f'{sp.check_output("pwd").strip().decode()}',
+    "echo": "/bin/echo",
+}
+
+hg =  {
+    "cmd": "hg",
+    "get": "{cmd} pull --update",
+    "remotes": '{echo} -n "default = "; {cmd} paths default',
+    "allremotes": '{remotes}; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
+}
+
+git = {
+    "cmd": "git",
+    "get": "{cmd} pull",
+    "remotes": "{cmd} remote -v",
+    "allremotes": "{remotes}",
+}
