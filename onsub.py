@@ -16,8 +16,6 @@ def error(code, *args, **kwargs):
 
 def check_vars(vars):
     assert "default" in vars
-    assert "hg" in vars
-    assert "git" in vars
     return
 
 def format(st, dd, count):
@@ -57,8 +55,7 @@ def main():
     parser.add_argument("--count", help="Count for subsitutions", type=int, default=10)
     parser.add_argument("--debug", help="Debug flag", action="store_true", default=False)
     parser.add_argument("--depth", help="Walk depth", type=int, default=-1)
-    parser.add_argument("--git", help="Git", action="store_true", default=False)
-    parser.add_argument("--hg", help="Hg", action="store_true", default=False)
+    parser.add_argument("--enable", help="Enabled sections", action="append")
     parser.add_argument("--quiet", help="Quiet", action="store_true", default=False)
     parser.add_argument("--verbose", help="Verbose", action="store_true", default=False)
     parser.add_argument("rest", nargs=ap.REMAINDER)
@@ -69,10 +66,8 @@ def main():
     count = args.count
     debug = args.debug
     depth = args.depth
-    neither = not args.hg and not args.git
-    dohg = dogit = False
-    if args.hg or neither: dohg = True
-    if args.git or neither: dogit = True
+    enables = []
+    if args.enable: enables = args.enable
     quiet = args.quiet
     verbose = args.verbose
     if len(args.rest) < 1: error(1, "Not enough command arguments")
@@ -82,30 +77,30 @@ def main():
     dd = {}
     exec(rc, globals(), dd)
     check_vars(dd)
+    markers = {}
+    for kk, vv in dd.items():
+        if kk == "default": continue
+        try: marker = dd[kk]["marker"]
+        except KeyError: error(2, "No marker in {kk} section".format(kk=kk))
+        if len(enables) == 0 or kk in enables: markers[kk] = marker
+        continue
 
-    hgdir = ".hg"
-    gitdir = ".git"
     root = os.getcwd()
     for path, subdirs, files in os.walk(".", followlinks=True):
         dd = {}
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep > depth: continue
-        if dohg and os.path.exists("{path}/{hgdir}".format(path=path, hgdir=hgdir)):
-            with pushd.pushd(path) as ctx:
-                exec(rc, globals(), dd)
-                default = dd["default"]
-                default.update(dd["hg"])
-                doit(default, rest, count, "hg", quiet, verbose, debug)
+        for section, marker in markers.items():
+            markerfile = "{path}/{marker}".format(path=path, marker=marker)
+            if os.path.exists(markerfile):
+                with pushd.pushd(path) as ctx:
+                    exec(rc, globals(), dd)
+                    default = dd["default"]
+                    default.update(dd[section])
+                    doit(default, rest, count, section, quiet, verbose, debug)
+                    pass
                 pass
-            pass
-        if dogit and os.path.exists("{path}/{gitdir}".format(path=path, gitdir=gitdir)):
-            with pushd.pushd(path) as ctx:
-                exec(rc, globals(), dd)
-                default = dd["default"]
-                default.update(dd["git"])
-                doit(default, rest, count, "git", quiet, verbose, debug)
-                pass
-            pass
+            continue
         continue
     return
 

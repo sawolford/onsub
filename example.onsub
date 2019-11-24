@@ -4,6 +4,7 @@ default = {
 }
 
 hg =  {
+    "marker": ".hg",
     "cmd": "hg",
     "get": "{cmd} pull --update",
     "remotes": '{echo} -n "default = "; {cmd} paths default',
@@ -11,6 +12,7 @@ hg =  {
 }
 
 git = {
+    "marker": ".git",
     "cmd": "git",
     "get": "{cmd} pull",
     "remotes": "{cmd} remote -v",
