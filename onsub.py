@@ -57,11 +57,13 @@ def main():
     if os.name == "nt": os.system("color")
     parser = ap.ArgumentParser(description="Walks filesystem executing arbitrary commands", formatter_class=ap.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--command", help="Prefix {cmd}", action="store_true", default=False)
-    parser.add_argument("--config", help="Config file", type=str, default=f'{os.environ["HOME"]}/.onsub.py')
+    parser.add_argument("--config", help="Config option", action="append")
+    parser.add_argument("--configfile", help="Config file", type=str, default=f'{os.environ["HOME"]}/.onsub.py')
     parser.add_argument("--count", help="Count for subsitutions", type=int, default=10)
     parser.add_argument("--debug", help="Debug flag", action="store_true")
     parser.add_argument("--depth", help="Walk depth", type=int, default=-1)
     parser.add_argument("--enable", help="Enabled sections", action="append")
+    parser.add_argument("--file", help="File with folder names", action="append")
     parser.add_argument("--verbose", help="Verbose", type=int, default=4)
     parser.add_argument("rest", nargs=ap.REMAINDER)
     args = parser.parse_args()
@@ -69,18 +71,56 @@ def main():
     if args.command: command = ["{cmd}"]
     elif len(args.rest) < 1: error(1, "Not enough command arguments")
     rest = " ".join(command + args.rest)
-    configfile = args.config
+    configfile = args.configfile
+    configs = []
+    if args.config: configs = args.config
     count = args.count
     debug = args.debug
     depth = args.depth
     enables = []
     if args.enable: enables = args.enable
+    files = []
+    if args.file: files = args.file
     verbose = args.verbose
 
+    paths = {}
+    for file in files:
+        frc = {}
+        exec(open(file).read(), globals(), frc)
+        for section in frc:
+            for path in frc[section]:
+                paths.setdefault(section, []).append(path)
+                continue
+            continue
+        continue
+
+    def pathIterate():
+        for root, dirs, files in os.walk(".", followlinks=True): yield root, "", "", ""
+        return
+    if len(paths):
+        def pathIterate(paths=paths):
+            for section in paths:
+                for entry in paths[section]:
+                    path, url, revision = "", "", ""
+                    if type(entry) == type(()):
+                        if len(entry) >= 3: revision = entry[2]
+                        if len(entry) >= 2: url = entry[1]
+                        if len(entry) >= 1: path = entry[0]
+                        pass
+                    elif type(entry) == type(""): path = entry
+                    yield path, url, revision, section
+                    continue
+                continue
+            return
+        pass
+    
     rcstring = open(configfile).read()
     rc = {}
     exec(rcstring, globals(), rc)
     check_vars(rc)
+    for config in configs:
+        exec(config, globals(), rc)
+        continue
     markers = {}
     for kk, vv in rc.items():
         if kk == "default" or kk == "colors": continue
@@ -99,10 +139,17 @@ def main():
     root = os.getcwd()
     errors = []
     futures = []
-    for path, subdirs, files in os.walk(".", followlinks=True):
+    for path, url, rev, section in pathIterate():
         rc = {}
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
+        if not os.path.exists(path):
+            exec(rcstring, globals(), rc)
+            default = rc["default"]
+            default.update(rc[section])
+            missing = rc[section]["missing"]
+            if section in enables: missing(path, url, rev, verbose, debug)
+            pass
         with pushd.pushd(path) as ctx:
             for section, marker in markers.items():
                 if marker():
