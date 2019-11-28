@@ -52,10 +52,21 @@ def doit(path, cmd, extra, verbose, debug):
         pass
     return pheader, cheader, ec, out
 
+class pyfuncfuture:
+    def __init__(self, pheader, cheader, ec, out):
+        self.pheader = pheader
+        self.cheader = cheader
+        self.ec = ec
+        self.out = out
+        return
+    def result(self): return self.pheader, self.cheader, self.ec, self.out
+    pass
+
 def main():
     signal.signal(signalnum = signal.SIGINT, handler = signal.SIG_DFL)
     if os.name == "nt": os.system("color")
-    parser = ap.ArgumentParser(description="Walks filesystem executing arbitrary commands", formatter_class=ap.ArgumentDefaultsHelpFormatter)
+    fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=32)
+    parser = ap.ArgumentParser(description="Walks filesystem executing arbitrary commands", formatter_class=fc)
     parser.add_argument("--command", help="Prefix {cmd}", action="store_true", default=False)
     parser.add_argument("--config", help="Config option", action="append")
     parser.add_argument("--configfile", help="Config file", type=str, default=f'{os.environ["HOME"]}/.onsub.py')
@@ -70,7 +81,7 @@ def main():
     command = []
     if args.command: command = ["{cmd}"]
     elif len(args.rest) < 1: error(1, "Not enough command arguments")
-    rest = " ".join(command + args.rest)
+    rest = args.rest
     configfile = args.configfile
     configs = []
     if args.config: configs = args.config
@@ -95,20 +106,14 @@ def main():
         continue
 
     def pathIterate():
-        for root, dirs, files in os.walk(".", followlinks=True): yield root, "", "", ""
+        for root, dirs, files in os.walk(".", followlinks=True): yield root, None, None
         return
     if len(paths):
         def pathIterate(paths=paths):
             for section in paths:
                 for entry in paths[section]:
-                    path, url, revision = "", "", ""
-                    if type(entry) == type(()):
-                        if len(entry) >= 3: revision = entry[2]
-                        if len(entry) >= 2: url = entry[1]
-                        if len(entry) >= 1: path = entry[0]
-                        pass
-                    elif type(entry) == type(""): path = entry
-                    yield path, url, revision, section
+                    if type(entry) == type(""): yield entry, section, None
+                    else: yield entry[0], section, entry[1:]
                     continue
                 continue
             return
@@ -139,7 +144,7 @@ def main():
     root = os.getcwd()
     errors = []
     futures = []
-    for path, url, rev, section in pathIterate():
+    for path, section, entry in pathIterate():
         rc = {}
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
@@ -148,7 +153,7 @@ def main():
             default = rc["default"]
             default.update(rc[section])
             missing = rc[section]["missing"]
-            if section in enables: missing(path, url, rev, verbose, debug)
+            if len(enables) == 0 or section in enables: missing(verbose, debug, path, *entry)
             pass
         with pushd.pushd(path) as ctx:
             for section, marker in markers.items():
@@ -156,8 +161,19 @@ def main():
                     exec(rcstring, globals(), rc)
                     default = rc["default"]
                     default.update(rc[section])
-                    cmd = format(rest, default, count)
-                    future = doit(path, cmd, section, verbose, debug)
+                    if rest[0][:3] == "py:":
+                        cmd = rest[0]
+                        rem = rest[1:]
+                        pheader = "{path} ({section})".format(path=path, section=section)
+                        cheader = "{cmd}".format(cmd=cmd)
+                        pyfunc = rc[section][cmd]
+                        ec, out = pyfunc(path, *rem)
+                        future = pyfuncfuture(pheader, cheader, ec, out)
+                        pass
+                    else:
+                        cmd = format(" ".join(command + args.rest), default, count)
+                        future = doit(path, cmd, section, verbose, debug)
+                        pass
                     futures.append(future)
                     pass
                 continue

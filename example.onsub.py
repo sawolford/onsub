@@ -9,13 +9,10 @@ colors = {
 
 defdefault = {}
 
-deflinux = {}
-if os.name != "nt":
-    deflinux = {
-        "cwd": f'{sp.check_output("pwd").strip().decode()}',
-        "echo": "/bin/echo",
-    }
-    pass
+deflinux = {
+    "echo": "/bin/echo",
+}
+if os.name != "nt": deflinux["cwd"] = f'{sp.check_output("pwd").strip().decode()}'
 
 defwindows = {}
 
@@ -25,18 +22,31 @@ if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
 default["ignore"] = False
 
-def hgmissing(path, url, rev, verbose, debug):
+def hgmissing(verbose, debug, path, *rest):
+    assert len(rest) >= 1
+    rev = "default"
+    if len(rest) >= 2: rev = rest[1]
+    url = rest[0]
     cmd = "hg clone {url} {path} -r {rev}".format(path=path, url=url, rev=rev)
     print(cmd)
     ec, out = mysystem(cmd)
     print(out)
     return
 
+def fileCheck(path, *args):
+    if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
+    fname = args[0]
+    exists = os.path.exists(fname)
+    fpath = "{path}/{fname}".format(path=path, fname=fname)
+    if exists: return 0, "{fpath} exists".format(fpath=fpath)
+    return 1, "{fpath} does not exist".format(fpath=fpath)
+
 hgdefault =  {
     "marker": lambda: os.path.exists(".hg"),
     "missing": hgmissing,
     "cmd": "hg",
     "get": "{cmd} pull --update",
+    "py:fileCheck": fileCheck,
 }
 
 hglinux = {
@@ -55,8 +65,10 @@ if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
 hg["ignore"] = False
 
-def gitmissing(path, url, rev, verbose, debug):
-    cmd = "git clone {url} {path}".format(path=path, url=url, rev=rev)
+def gitmissing(verbose, debug, path, *rest):
+    assert len(rest) >= 1
+    url = rest[0]
+    cmd = "git clone {url} {path}".format(path=path, url=url)
     print(cmd)
     ec, out = mysystem(cmd)
     print(out)
@@ -69,6 +81,7 @@ gitdefault = {
     "get": "{cmd} pull",
     "remotes": "{cmd} remote -v",
     "allremotes": "{remotes}",
+    "py:fileCheck": fileCheck,
 }
 
 gitlinux = {}
@@ -80,8 +93,12 @@ if os.name == "nt": git.update(gitwindows)
 else: git.update(gitlinux)
 git["ignore"] = False
 
-def svnmissing(path, url, rev, verbose, debug):
-    cmd = "svn checkout {url} {path}".format(path=path, url=url, rev=rev)
+def svnmissing(verbose, debug, path, *rest):
+    assert len(rest) >= 1
+    rev = "head"
+    if len(rest) >= 2: rev = rest[1]
+    url = rest[0]
+    cmd = "svn checkout {url}@{rev} {path}".format(path=path, url=url, rev=rev)
     print(cmd)
     ec, out = mysystem(cmd)
     print(out)
@@ -94,6 +111,7 @@ svndefault = {
     "get": "{cmd} up",
     "remotes": "{cmd} info --show-item url",
     "allremotes": "{remotes}",
+    "py:fileCheck": fileCheck,
 }
 
 svnlinux = {}
