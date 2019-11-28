@@ -44,7 +44,7 @@ def mysystem(cmd):
 def doit(path, cmd, extra, verbose, debug):
     pheader = "{path} ({extra})".format(path=path, extra=extra)
     cheader = "{cmd}".format(cmd=cmd)
-    if verbose >= 4: print(pheader, " ", cheader)
+    if verbose >= 4: print(pheader, cheader)
     ec, out = mysystem(cmd)
     if debug:
         print(pheader, cheader, "=", ec)
@@ -126,17 +126,17 @@ def main():
     for config in configs:
         exec(config, globals(), rc)
         continue
-    markers = {}
+    includes = {}
     for kk, vv in rc.items():
         if kk == "default" or kk == "colors": continue
         if type(rc[kk]) != type({}): continue
-        ignore = True
-        try: ignore = rc[kk]["ignore"]
+        private = True
+        try: private = rc[kk]["py:private"]
         except KeyError: pass
-        if not ignore:
-            try: marker = rc[kk]["marker"]
-            except KeyError: error(2, "No marker in {kk} section".format(kk=kk))
-            if len(enables) == 0 or kk in enables: markers[kk] = marker
+        if not private:
+            try: include = rc[kk]["py:include"]
+            except KeyError: error(2, "No include in {kk} section".format(kk=kk))
+            if len(enables) == 0 or kk in enables: includes[kk] = include
             pass
         continue
     colors = rc["colors"]
@@ -152,12 +152,12 @@ def main():
             exec(rcstring, globals(), rc)
             default = rc["default"]
             default.update(rc[section])
-            missing = rc[section]["missing"]
+            missing = rc[section]["py:missing"]
             if len(enables) == 0 or section in enables: missing(verbose, debug, path, *entry)
             pass
         with pushd.pushd(path) as ctx:
-            for section, marker in markers.items():
-                if marker():
+            for section, include in includes.items():
+                if include():
                     exec(rcstring, globals(), rc)
                     default = rc["default"]
                     default.update(rc[section])

@@ -20,7 +20,7 @@ default = {}
 default.update(defdefault)
 if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
-default["ignore"] = False
+default["py:private"] = False
 
 def hgmissing(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -42,8 +42,8 @@ def fileCheck(path, *args):
     return 1, "{fpath} does not exist".format(fpath=fpath)
 
 hgdefault =  {
-    "marker": lambda: os.path.exists(".hg"),
-    "missing": hgmissing,
+    "py:include": lambda: os.path.exists(".hg"),
+    "py:missing": hgmissing,
     "cmd": "hg",
     "get": "{cmd} pull --update",
     "py:fileCheck": fileCheck,
@@ -63,7 +63,7 @@ hg = {}
 hg.update(hgdefault)
 if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
-hg["ignore"] = False
+hg["py:private"] = False
 
 def gitmissing(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -75,8 +75,8 @@ def gitmissing(verbose, debug, path, *rest):
     return
 
 gitdefault = {
-    "marker": lambda: os.path.exists(".git"),
-    "missing": gitmissing,
+    "py:include": lambda: os.path.exists(".git"),
+    "py:missing": gitmissing,
     "cmd": "git",
     "get": "{cmd} pull",
     "remotes": "{cmd} remote -v",
@@ -91,7 +91,7 @@ git = {}
 git.update(gitdefault)
 if os.name == "nt": git.update(gitwindows)
 else: git.update(gitlinux)
-git["ignore"] = False
+git["py:private"] = False
 
 def svnmissing(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -105,8 +105,8 @@ def svnmissing(verbose, debug, path, *rest):
     return
 
 svndefault = {
-    "marker": lambda: os.path.exists(".svn"),
-    "missing": svnmissing,
+    "py:include": lambda: os.path.exists(".svn"),
+    "py:missing": svnmissing,
     "cmd": "svn",
     "get": "{cmd} up",
     "remotes": "{cmd} info --show-item url",
@@ -121,9 +121,9 @@ svn = {}
 svn.update(svndefault)
 if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
-svn["ignore"] = False
+svn["py:private"] = False
 
 every = {
-    "marker": lambda: True,
-    "ignore": True,
+    "py:include": lambda: True,
+    "py:private": True,
 }
