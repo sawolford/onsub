@@ -1,10 +1,10 @@
 colors = {
-    "path": "blue",
-    "command": "cyan",
-    "good": "green",
-    "bad": "magenta",
-    "error": "red",
-    "partition": "yellow",
+#     "path": "blue",
+#     "command": "cyan",
+#     "good": "green",
+#     "bad": "magenta",
+#     "error": "red",
+#     "partition": "yellow",
 }
 
 defdefault = {}
@@ -123,7 +123,12 @@ if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
 svn["py:private"] = False
 
+def everymissing(verbose, debug, path, *rest):
+    os.makedirs(path)
+    return
+
 every = {
     "py:include": lambda: True,
+    "py:missing": everymissing,
     "py:private": True,
 }

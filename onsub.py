@@ -16,7 +16,6 @@ def error(code, *args, **kwargs):
     return
 
 def check_vars(vars):
-    assert "colors" in vars
     assert "default" in vars
     return
 
@@ -148,12 +147,22 @@ def main():
             if len(enables) == 0 or kk in enables: includes[kk] = include
             pass
         continue
-    colors = rc["colors"]
+    colors = {
+        "path": "blue",
+        "command": "cyan",
+        "good": "green",
+        "bad": "magenta",
+        "error": "red",
+        "partition": "yellow",
+    }
+    try: colors.update(rc["colors"])
+    except KeyError: pass
 
     root = os.getcwd()
     errors = []
     futures = []
     for path, section, entry in pathIterate():
+        if not entry: entry = tuple()
         rc = {}
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
@@ -165,6 +174,7 @@ def main():
             except KeyError as exc: error(3, 'No "{pymissing}" key in section {section}'.format(pymissing=pymissing, section=section))
             if len(enables) == 0 or section in enables: missing(verbose, debug, path, *entry)
             pass
+        if noop: continue
         with pushd.pushd(path) as ctx:
             for section, include in includes.items():
                 if include():
@@ -180,15 +190,12 @@ def main():
                         except KeyError as exc: error(4, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
                         ec, out = pyfunc(path, *rem)
                         future = pyfuncfuture(pheader, cheader, ec, out)
-                        futures.append(future)
                         pass
                     else:
-                        if not noop:
-                            cmd = format(" ".join(command + args.rest), default, count)
-                            future = doit(path, cmd, section, verbose, debug)
-                            futures.append(future)
-                            pass
+                        cmd = format(" ".join(command + args.rest), default, count)
+                        future = doit(path, cmd, section, verbose, debug)
                         pass
+                    futures.append(future)
                     pass
                 continue
             pass
