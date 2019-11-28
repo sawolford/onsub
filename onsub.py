@@ -51,6 +51,11 @@ def doit(path, cmd, extra, verbose, debug):
         pass
     return pheader, cheader, ec, out
 
+@concurrent.process
+def domissing(missing, path, cheader):
+    ec, out = missing()
+    return path, cheader, ec, out
+
 class pyfuncfuture:
     def __init__(self, pheader, cheader, ec, out):
         self.pheader = pheader
@@ -172,19 +177,23 @@ def main():
             default.update(rc[section])
             try: missing = rc[section][pymissing]
             except KeyError as exc: error(3, 'No "{pymissing}" key in section {section}'.format(pymissing=pymissing, section=section))
-            if len(enables) == 0 or section in enables: missing(verbose, debug, path, *entry)
+            if len(enables) == 0 or section in enables:
+                if noop: futures.append(domissing(lambda: missing(verbose, debug, path, *entry), path, missing.__name__))
+                else: missing(verbose, debug, path, *entry)
+                pass
             pass
         if noop: continue
         with pushd.pushd(path) as ctx:
-            for section, include in includes.items():
+            for possible, include in includes.items():
+                if section != possible: continue
                 if include():
                     exec(rcstring, globals(), rc)
                     default = rc["default"]
-                    default.update(rc[section])
+                    default.update(rc[possible])
                     if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
                         cmd = rest[0]
                         rem = rest[1:]
-                        pheader = "{path} ({section})".format(path=path, section=section)
+                        pheader = "{path} ({possible})".format(path=path, section=section)
                         cheader = "{cmd}".format(cmd=cmd)
                         try: pyfunc = rc[section][cmd]
                         except KeyError as exc: error(4, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))

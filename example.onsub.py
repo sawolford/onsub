@@ -28,10 +28,10 @@ def hgmissing(verbose, debug, path, *rest):
     if len(rest) >= 2: rev = rest[1]
     url = rest[0]
     cmd = "hg clone {url} {path} -r {rev}".format(path=path, url=url, rev=rev)
-    print(cmd)
+    if verbose >= 4: print(cmd)
     ec, out = mysystem(cmd)
-    print(out)
-    return
+    if verbose >= 5: print(out)
+    return ec, out
 
 def fileCheck(path, *args):
     if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
@@ -69,10 +69,10 @@ def gitmissing(verbose, debug, path, *rest):
     assert len(rest) >= 1
     url = rest[0]
     cmd = "git clone {url} {path}".format(path=path, url=url)
-    print(cmd)
+    if verbose >= 4: print(cmd)
     ec, out = mysystem(cmd)
-    print(out)
-    return
+    if verbose >= 5: print(out)
+    return ec, out
 
 gitdefault = {
     "py:include": lambda: os.path.exists(".git"),
@@ -99,10 +99,10 @@ def svnmissing(verbose, debug, path, *rest):
     if len(rest) >= 2: rev = rest[1]
     url = rest[0]
     cmd = "svn checkout {url}@{rev} {path}".format(path=path, url=url, rev=rev)
-    print(cmd)
+    if verbose >= 4: print(cmd)
     ec, out = mysystem(cmd)
-    print(out)
-    return
+    if verbose >= 5: print(out)
+    return ec, out
 
 svndefault = {
     "py:include": lambda: os.path.exists(".svn"),
@@ -125,7 +125,7 @@ svn["py:private"] = False
 
 def everymissing(verbose, debug, path, *rest):
     os.makedirs(path)
-    return
+    return 0, "os.makedirs({path})".format(path=path)
 
 every = {
     "py:include": lambda: True,
