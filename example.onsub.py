@@ -24,10 +24,10 @@ default["py:private"] = False
 
 def hgmissing(verbose, debug, path, *rest):
     assert len(rest) >= 1
-    rev = "default"
-    if len(rest) >= 2: rev = rest[1]
+    rrev = ""
+    if len(rest) >= 2: rrev = "-r {rev}".format(rev=rest[1])
     url = rest[0]
-    cmd = "hg clone {url} {path} -r {rev}".format(path=path, url=url, rev=rev)
+    cmd = "hg clone {url} {path} {rrev}".format(path=path, url=url, rrev=rrev)
     if verbose >= 4: print(cmd)
     ec, out = mysystem(cmd)
     if verbose >= 5: print(out)

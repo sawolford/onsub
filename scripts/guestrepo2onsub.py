@@ -24,7 +24,9 @@ guestrepotok = tokenize(open(hgguestrepo).readlines())
 grmappingtok = tokenize(open(hggrmapping).readlines())
 
 guestrepo = {}
+includerev = False
 for name, sym, rev in guestrepotok:
+    if rev != "default": includerev = True
     guestrepo[name] = (sym, rev)
     continue
 
@@ -40,8 +42,10 @@ for name, (sym, rev) in guestrepo.items():
     print(name, end="")
     print('", "', end="")
     print(repo, end="")
-    print('", "', end="")
-    print(rev, end="")
+    if includerev:
+        print('", "', end="")
+        print(rev, end="")
+        pass
     print('"),')
     continue
 print("]")

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+import sys
 import onsub
 if __name__ == "__main__":
-    onsub.main()
+    rv = onsub.main()
+    if rv >= 256: print("Errors exceed 255", file=sys.stderr)
+    sys.exit(rv)
     pass

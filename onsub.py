@@ -185,7 +185,7 @@ def main():
         if noop: continue
         with pushd.pushd(path) as ctx:
             for possible, include in includes.items():
-                if section != possible: continue
+                if section and section != possible: continue
                 if include():
                     exec(rcstring, globals(), rc)
                     default = rc["default"]
@@ -242,10 +242,11 @@ def main():
             tc.cprint(out, colors["error"])
             continue
         pass
-    return
+    return nerrors
 
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
-    main()
-    pass
+    rv = onsub.main()
+    if rv >= 256: print("Errors exceed 255", file=sys.stderr)
+    sys.exit(rv)
