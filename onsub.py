@@ -75,11 +75,17 @@ def main():
     parser.add_argument("--depth", help="Walk depth", type=int, default=-1)
     parser.add_argument("--enable", help="Enabled sections", action="append")
     parser.add_argument("--file", help="File with folder names", action="append")
+    parser.add_argument("--noop", help="No command execution", action="store_true")
+    parser.add_argument("--py:include", dest="include", help="Key for py:include", type=str, default="py:include")
+    parser.add_argument("--py:missing", dest="missing", help="Key for py:missing", type=str, default="py:missing")
+    parser.add_argument("--py:private", dest="private", help="Key for py:private", type=str, default="py:private")
     parser.add_argument("--verbose", help="Verbose", type=int, default=4)
     parser.add_argument("rest", nargs=ap.REMAINDER)
     args = parser.parse_args()
     command = []
     if args.command: command = ["{cmd}"]
+    noop = False
+    if args.noop: noop = True
     elif len(args.rest) < 1: error(1, "Not enough command arguments")
     rest = args.rest
     configfile = args.configfile
@@ -93,6 +99,9 @@ def main():
     files = []
     if args.file: files = args.file
     verbose = args.verbose
+    pyinclude = args.include
+    pymissing = args.missing
+    pyprivate = args.private
 
     paths = {}
     for file in files:
@@ -131,11 +140,11 @@ def main():
         if kk == "default" or kk == "colors": continue
         if type(rc[kk]) != type({}): continue
         private = True
-        try: private = rc[kk]["py:private"]
+        try: private = rc[kk][pyprivate]
         except KeyError: pass
         if not private:
-            try: include = rc[kk]["py:include"]
-            except KeyError: error(2, "No include in {kk} section".format(kk=kk))
+            try: include = rc[kk][pyinclude]
+            except KeyError: error(2, 'No {pyinclude} key in {kk} section'.format(pyinclude=pyinclude, kk=kk))
             if len(enables) == 0 or kk in enables: includes[kk] = include
             pass
         continue
@@ -152,7 +161,8 @@ def main():
             exec(rcstring, globals(), rc)
             default = rc["default"]
             default.update(rc[section])
-            missing = rc[section]["py:missing"]
+            try: missing = rc[section][pymissing]
+            except KeyError as exc: error(3, 'No "{pymissing}" key in section {section}'.format(pymissing=pymissing, section=section))
             if len(enables) == 0 or section in enables: missing(verbose, debug, path, *entry)
             pass
         with pushd.pushd(path) as ctx:
@@ -161,20 +171,24 @@ def main():
                     exec(rcstring, globals(), rc)
                     default = rc["default"]
                     default.update(rc[section])
-                    if rest[0][:3] == "py:":
+                    if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
                         cmd = rest[0]
                         rem = rest[1:]
                         pheader = "{path} ({section})".format(path=path, section=section)
                         cheader = "{cmd}".format(cmd=cmd)
-                        pyfunc = rc[section][cmd]
+                        try: pyfunc = rc[section][cmd]
+                        except KeyError as exc: error(4, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
                         ec, out = pyfunc(path, *rem)
                         future = pyfuncfuture(pheader, cheader, ec, out)
+                        futures.append(future)
                         pass
                     else:
-                        cmd = format(" ".join(command + args.rest), default, count)
-                        future = doit(path, cmd, section, verbose, debug)
+                        if not noop:
+                            cmd = format(" ".join(command + args.rest), default, count)
+                            future = doit(path, cmd, section, verbose, debug)
+                            futures.append(future)
+                            pass
                         pass
-                    futures.append(future)
                     pass
                 continue
             pass
