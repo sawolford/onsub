@@ -11,6 +11,7 @@ defdefault = {}
 
 deflinux = {
     "echo": "/bin/echo",
+    "lswcl": "ls | wc -l"
 }
 if os.name != "nt": deflinux["cwd"] = f'{sp.check_output("pwd").strip().decode()}'
 
@@ -22,28 +23,27 @@ if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
 default["py:private"] = False
 
-def hgmissing(verbose, debug, path, *rest):
+def hgmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
     rrev = ""
     if len(rest) >= 2: rrev = "-r {rev}".format(rev=rest[1])
     url = rest[0]
     cmd = "hg clone {url} {path} {rrev}".format(path=path, url=url, rrev=rrev)
-    if verbose >= 4: print(cmd)
-    ec, out = mysystem(cmd)
-    if verbose >= 5: print(out)
-    return ec, out
+    if debug: print(cmd)
+    return cmd
 
-def fileCheck(path, *args):
+def fileCheck(verbose, debug, path, *args):
     if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
     fname = args[0]
+    if verbose >= 4: print("os.path.exists({fname})".format(fname=fname))
     exists = os.path.exists(fname)
     fpath = "{path}/{fname}".format(path=path, fname=fname)
     if exists: return 0, "{fpath} exists".format(fpath=fpath)
     return 1, "{fpath} does not exist".format(fpath=fpath)
 
 hgdefault =  {
-    "py:include": lambda: os.path.exists(".hg"),
-    "py:missing": hgmissing,
+    "py:include": lambda verbose, debug, path: os.path.exists(".hg"),
+    "py:makecommand": hgmakecommand,
     "cmd": "hg",
     "get": "{cmd} pull --update",
     "py:fileCheck": fileCheck,
@@ -65,18 +65,16 @@ if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
 hg["py:private"] = False
 
-def gitmissing(verbose, debug, path, *rest):
+def gitmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
     url = rest[0]
     cmd = "git clone {url} {path}".format(path=path, url=url)
-    if verbose >= 4: print(cmd)
-    ec, out = mysystem(cmd)
-    if verbose >= 5: print(out)
-    return ec, out
+    if debug: print(cmd)
+    return cmd
 
 gitdefault = {
-    "py:include": lambda: os.path.exists(".git"),
-    "py:missing": gitmissing,
+    "py:include": lambda verbose, debug, path: os.path.exists(".git"),
+    "py:makecommand": gitmakecommand,
     "cmd": "git",
     "get": "{cmd} pull",
     "remotes": "{cmd} remote -v",
@@ -93,20 +91,18 @@ if os.name == "nt": git.update(gitwindows)
 else: git.update(gitlinux)
 git["py:private"] = False
 
-def svnmissing(verbose, debug, path, *rest):
+def svnmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
     rev = "head"
     if len(rest) >= 2: rev = rest[1]
     url = rest[0]
     cmd = "svn checkout {url}@{rev} {path}".format(path=path, url=url, rev=rev)
-    if verbose >= 4: print(cmd)
-    ec, out = mysystem(cmd)
-    if verbose >= 5: print(out)
-    return ec, out
+    if debug: print(cmd)
+    return cmd
 
 svndefault = {
-    "py:include": lambda: os.path.exists(".svn"),
-    "py:missing": svnmissing,
+    "py:include": lambda verbose, debug, path: os.path.exists(".svn"),
+    "py:makecommand": svnmakecommand,
     "cmd": "svn",
     "get": "{cmd} up",
     "remotes": "{cmd} info --show-item url",
@@ -123,12 +119,13 @@ if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
 svn["py:private"] = False
 
-def everymissing(verbose, debug, path, *rest):
+def everymakefunction(verbose, debug, path, *rest):
+    if verbose >=4: print("os.makedirs({path})".format(path=path))
     os.makedirs(path)
     return 0, "os.makedirs({path})".format(path=path)
 
 every = {
-    "py:include": lambda: True,
-    "py:missing": everymissing,
+    "py:include": lambda verbose, debug, path: True,
+    "py:makefunction": everymakefunction,
     "py:private": True,
 }

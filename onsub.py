@@ -2,9 +2,10 @@
 import os, signal, sys
 import argparse as ap
 import subprocess as sp
+import multiprocessing as mp
 import termcolor as tc
-from pebble import concurrent
-import pushd
+import pushd as pd
+import pebble as pb
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -39,9 +40,8 @@ def mysystem(cmd):
         pass
     return ec, out
 
-@concurrent.process
-def doit(path, cmd, extra, verbose, debug):
-    pheader = "{path} ({extra})".format(path=path, extra=extra)
+def work(path, cmd, section, verbose, debug):
+    pheader = "{path} ({section})".format(path=path, section=section)
     cheader = "{cmd}".format(cmd=cmd)
     if verbose >= 4: print(pheader, cheader)
     ec, out = mysystem(cmd)
@@ -51,10 +51,9 @@ def doit(path, cmd, extra, verbose, debug):
         pass
     return pheader, cheader, ec, out
 
-@concurrent.process
-def domissing(missing, path, cheader):
-    ec, out = missing()
-    return path, cheader, ec, out
+def cdwork(path, cmd, section, verbose, debug, cd):
+    with pd.pushd(cd): rv = work(path, cmd, section, verbose, debug)
+    return rv
 
 class pyfuncfuture:
     def __init__(self, pheader, cheader, ec, out):
@@ -81,16 +80,19 @@ def main():
     parser.add_argument("--file", help="File with folder names", action="append")
     parser.add_argument("--noop", help="No command execution", action="store_true")
     parser.add_argument("--py:include", dest="include", help="Key for py:include", type=str, default="py:include")
-    parser.add_argument("--py:missing", dest="missing", help="Key for py:missing", type=str, default="py:missing")
+    parser.add_argument("--py:makecommand", dest="makecommand", help="Key for py:makecommand", type=str, default="py:makecommand")
+    parser.add_argument("--py:makefunction", dest="makefunction", help="Key for py:makefunction", type=str, default="py:makefunction")
     parser.add_argument("--py:private", dest="private", help="Key for py:private", type=str, default="py:private")
-    parser.add_argument("--verbose", help="Verbose", type=int, default=4)
+    parser.add_argument("--suppress", help="Suppress repeated error output", action="store_true")
+    parser.add_argument("--verbose", help="Verbose level", type=int, default=4)
+    parser.add_argument("--workers", help="Number of workers", type=int, default=mp.cpu_count())
     parser.add_argument("rest", nargs=ap.REMAINDER)
     args = parser.parse_args()
     command = []
     if args.command: command = ["{cmd}"]
     noop = False
     if args.noop: noop = True
-    elif len(args.rest) < 1: error(1, "Not enough command arguments")
+    elif len(args.rest) < 1: error(256 - 1, "Not enough command arguments")
     rest = args.rest
     configfile = args.configfile
     configs = []
@@ -102,17 +104,20 @@ def main():
     if args.enable: enables = args.enable
     files = []
     if args.file: files = args.file
+    suppress = args.suppress
     verbose = args.verbose
+    workers = args.workers
     pyinclude = args.include
-    pymissing = args.missing
+    pymakefunction = args.makefunction
+    pymakecommand = args.makecommand
     pyprivate = args.private
 
     paths = {}
     for file in files:
-        frc = {}
-        exec(open(file).read(), globals(), frc)
-        for section in frc:
-            for path in frc[section]:
+        rc = {}
+        exec(open(file).read(), globals(), rc)
+        for section in rc:
+            for path in rc[section]:
                 paths.setdefault(section, []).append(path)
                 continue
             continue
@@ -148,7 +153,7 @@ def main():
         except KeyError: pass
         if not private:
             try: include = rc[kk][pyinclude]
-            except KeyError: error(2, 'No {pyinclude} key in {kk} section'.format(pyinclude=pyinclude, kk=kk))
+            except KeyError: error(256 - 2, 'No {pyinclude} key in {kk} section'.format(pyinclude=pyinclude, kk=kk))
             if len(enables) == 0 or kk in enables: includes[kk] = include
             pass
         continue
@@ -163,6 +168,7 @@ def main():
     try: colors.update(rc["colors"])
     except KeyError: pass
 
+    pool = pb.ProcessPool(max_workers=workers)
     root = os.getcwd()
     errors = []
     futures = []
@@ -175,39 +181,51 @@ def main():
             exec(rcstring, globals(), rc)
             default = rc["default"]
             default.update(rc[section])
-            try: missing = rc[section][pymissing]
-            except KeyError as exc: error(3, 'No "{pymissing}" key in section {section}'.format(pymissing=pymissing, section=section))
+            makefunction = makecommand = None
+            try: makecommand = rc[section][pymakecommand]
+            except KeyError:
+                try: makefunction = rc[section][pymakefunction]
+                except: error(256 - 3, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+                pass
             if len(enables) == 0 or section in enables:
-                if noop: futures.append(domissing(lambda: missing(verbose, debug, path, *entry), path, missing.__name__))
-                else: missing(verbose, debug, path, *entry)
+                if makecommand:
+                    cmd = makecommand(verbose, debug, path, *entry)
+                    future = pool.schedule(work, args=[path, cmd, section, verbose, debug])
+                    pass
+                else:
+                    ec, out = makefunction(verbose, debug, path, *entry)
+                    future = pyfuncfuture(path, makefunction.__name__, ec, out)
+                    pass
+                if noop:
+                    futures.append(future)
+                    continue
+                future.result()
                 pass
             pass
-        if noop: continue
-        with pushd.pushd(path) as ctx:
-            for possible, include in includes.items():
-                if section and section != possible: continue
-                if include():
-                    exec(rcstring, globals(), rc)
-                    default = rc["default"]
-                    default.update(rc[possible])
-                    if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
-                        cmd = rest[0]
-                        rem = rest[1:]
-                        pheader = "{path} ({possible})".format(path=path, section=section)
-                        cheader = "{cmd}".format(cmd=cmd)
-                        try: pyfunc = rc[section][cmd]
-                        except KeyError as exc: error(4, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
-                        ec, out = pyfunc(path, *rem)
-                        future = pyfuncfuture(pheader, cheader, ec, out)
-                        pass
-                    else:
-                        cmd = format(" ".join(command + args.rest), default, count)
-                        future = doit(path, cmd, section, verbose, debug)
-                        pass
-                    futures.append(future)
+        for possible, include in includes.items():
+            if section and section != possible: continue
+            with pd.pushd(path): doinclude = include(verbose, debug, path)
+            if doinclude:
+                with pd.pushd(path): exec(rcstring, globals(), rc)
+                default = rc["default"]
+                default.update(rc[possible])
+                if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
+                    cmd = rest[0]
+                    rem = rest[1:]
+                    pheader = "{path} ({section})".format(path=path, section=section)
+                    cheader = "{cmd}".format(cmd=cmd)
+                    try: pyfunc = rc[section][cmd]
+                    except KeyError: error(256 - 4, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
+                    with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, *rem)
+                    future = pyfuncfuture(pheader, cheader, ec, out)
                     pass
-                continue
-            pass
+                else:
+                    cmd = format(" ".join(command + args.rest), default, count)
+                    future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, path])
+                    pass
+                futures.append(future)
+                pass
+            continue
         continue
 
     results = []
@@ -230,7 +248,7 @@ def main():
             pass
         continue
 
-    if nerrors > 0 and verbose >= 1:
+    if not suppress and verbose >= 1 and nerrors > 0:
         tc.cprint("<<< ERRORS >>>", colors["partition"])
         for pheader, cheader, ec, out in results:
             if not ec: continue
@@ -245,8 +263,7 @@ def main():
     return nerrors
 
 if __name__ == "__main__":
-    import multiprocessing
-    multiprocessing.freeze_support()
+    mp.freeze_support()
     rv = onsub.main()
-    if rv >= 256: print("Errors exceed 255", file=sys.stderr)
+    if rv >= 251: print("Errors exceed 251", file=sys.stderr)
     sys.exit(rv)
