@@ -11,7 +11,7 @@ defdefault = {}
 
 deflinux = {
     "echo": "/bin/echo",
-    "lswcl": "ls | wc -l"
+    "lswcl": "ls | wc -l",
 }
 if os.name != "nt": deflinux["cwd"] = f'{sp.check_output("pwd").strip().decode()}'
 
@@ -21,16 +21,7 @@ default = {}
 default.update(defdefault)
 if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
-default["py:private"] = False
-
-def hgmakecommand(verbose, debug, path, *rest):
-    assert len(rest) >= 1
-    rrev = ""
-    if len(rest) >= 2: rrev = "-r {rev}".format(rev=rest[1])
-    url = rest[0]
-    cmd = "hg clone {url} {path} {rrev}".format(path=path, url=url, rrev=rrev)
-    if debug: print(cmd)
-    return cmd
+default["py:disable"] = False
 
 def fileCheck(verbose, debug, path, *args):
     if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
@@ -40,6 +31,15 @@ def fileCheck(verbose, debug, path, *args):
     fpath = "{path}/{fname}".format(path=path, fname=fname)
     if exists: return 0, "{fpath} exists".format(fpath=fpath)
     return 1, "{fpath} does not exist".format(fpath=fpath)
+
+def hgmakecommand(verbose, debug, path, *rest):
+    assert len(rest) >= 1
+    rrev = ""
+    if len(rest) >= 2: rrev = "-r {rev}".format(rev=rest[1])
+    url = rest[0]
+    cmd = "hg clone {url} {path} {rrev}".format(path=path, url=url, rrev=rrev)
+    if debug: print(cmd)
+    return cmd
 
 hgdefault =  {
     "py:include": lambda verbose, debug, path: os.path.exists(".hg"),
@@ -63,7 +63,7 @@ hg = {}
 hg.update(hgdefault)
 if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
-hg["py:private"] = False
+hg["py:disable"] = False
 
 def gitmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -89,7 +89,7 @@ git = {}
 git.update(gitdefault)
 if os.name == "nt": git.update(gitwindows)
 else: git.update(gitlinux)
-git["py:private"] = False
+git["py:disable"] = False
 
 def svnmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -117,7 +117,7 @@ svn = {}
 svn.update(svndefault)
 if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
-svn["py:private"] = False
+svn["py:disable"] = False
 
 def everymakefunction(verbose, debug, path, *rest):
     if verbose >=4: print("os.makedirs({path})".format(path=path))
@@ -127,5 +127,8 @@ def everymakefunction(verbose, debug, path, *rest):
 every = {
     "py:include": lambda verbose, debug, path: True,
     "py:makefunction": everymakefunction,
-    "py:private": True,
+}
+
+none = {
+    "py:include": lambda verbose, debug, path: False,
 }

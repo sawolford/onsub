@@ -76,13 +76,14 @@ def main():
     parser.add_argument("--count", help="Count for subsitutions", type=int, default=10)
     parser.add_argument("--debug", help="Debug flag", action="store_true")
     parser.add_argument("--depth", help="Walk depth", type=int, default=-1)
+    parser.add_argument("--disable", help="Disabled sections", action="append")
     parser.add_argument("--enable", help="Enabled sections", action="append")
     parser.add_argument("--file", help="File with folder names", action="append")
     parser.add_argument("--noop", help="No command execution", action="store_true")
     parser.add_argument("--py:include", dest="include", help="Key for py:include", type=str, default="py:include")
-    parser.add_argument("--py:makecommand", dest="makecommand", help="Key for py:makecommand", type=str, default="py:makecommand")
-    parser.add_argument("--py:makefunction", dest="makefunction", help="Key for py:makefunction", type=str, default="py:makefunction")
-    parser.add_argument("--py:private", dest="private", help="Key for py:private", type=str, default="py:private")
+    parser.add_argument("--py:makecommand", dest="pymakecommand", help="Key for py:makecommand", type=str, default="py:makecommand")
+    parser.add_argument("--py:makefunction", dest="pymakefunction", help="Key for py:makefunction", type=str, default="py:makefunction")
+    parser.add_argument("--py:disable", dest="pydisable", help="Key for py:disable", type=str, default="py:disable")
     parser.add_argument("--suppress", help="Suppress repeated error output", action="store_true")
     parser.add_argument("--verbose", help="Verbose level", type=int, default=4)
     parser.add_argument("--workers", help="Number of workers", type=int, default=mp.cpu_count())
@@ -100,6 +101,8 @@ def main():
     count = args.count
     debug = args.debug
     depth = args.depth
+    disables = []
+    if args.disable: disables = args.disable
     enables = []
     if args.enable: enables = args.enable
     files = []
@@ -108,9 +111,9 @@ def main():
     verbose = args.verbose
     workers = args.workers
     pyinclude = args.include
-    pymakefunction = args.makefunction
-    pymakecommand = args.makecommand
-    pyprivate = args.private
+    pymakefunction = args.pymakefunction
+    pymakecommand = args.pymakecommand
+    pydisable = args.pydisable
 
     paths = {}
     for file in files:
@@ -148,13 +151,15 @@ def main():
     for kk, vv in rc.items():
         if kk == "default" or kk == "colors": continue
         if type(rc[kk]) != type({}): continue
-        private = True
-        try: private = rc[kk][pyprivate]
-        except KeyError: pass
-        if not private:
+        enable = kk in enables
+        disable = kk in disables
+        if len(enables) == 0 or enable:
+            try: defdisable = rc[kk][pydisable]
+            except KeyError: defdisable = True
+            if disable or (defdisable and not enable): continue
             try: include = rc[kk][pyinclude]
             except KeyError: error(256 - 2, 'No {pyinclude} key in {kk} section'.format(pyinclude=pyinclude, kk=kk))
-            if len(enables) == 0 or kk in enables: includes[kk] = include
+            includes[kk] = include
             pass
         continue
     colors = {
@@ -178,16 +183,16 @@ def main():
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         if not os.path.exists(path):
-            exec(rcstring, globals(), rc)
-            default = rc["default"]
-            default.update(rc[section])
-            makefunction = makecommand = None
-            try: makecommand = rc[section][pymakecommand]
-            except KeyError:
-                try: makefunction = rc[section][pymakefunction]
-                except: error(256 - 3, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
-                pass
-            if len(enables) == 0 or section in enables:
+            if section in includes:
+                exec(rcstring, globals(), rc)
+                default = rc["default"]
+                default.update(rc[section])
+                makefunction = makecommand = None
+                try: makecommand = rc[section][pymakecommand]
+                except KeyError:
+                    try: makefunction = rc[section][pymakefunction]
+                    except: error(256 - 3, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+                    pass
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
                     future = pool.schedule(work, args=[path, cmd, section, verbose, debug])
