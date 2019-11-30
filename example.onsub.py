@@ -60,6 +60,7 @@ hgwindows = {
 }
 
 hg = {}
+hg.update(default)
 hg.update(hgdefault)
 if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
@@ -85,6 +86,7 @@ gitlinux = {}
 gitwindows = {}
 
 git = {}
+git.update(default)
 git.update(gitdefault)
 if os.name == "nt": git.update(gitwindows)
 else: git.update(gitlinux)
@@ -112,6 +114,7 @@ svnlinux = {}
 svnwindows = {}
 
 svn = {}
+svn.update(default)
 svn.update(svndefault)
 if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
@@ -131,6 +134,7 @@ everylinux = {}
 everywindows = {}
 
 every = {}
+every.update(default)
 every.update(everydefault)
 if os.name == "nt": every.update(everywindows)
 else: every.update(everylinux)

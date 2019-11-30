@@ -16,10 +16,6 @@ def error(code, *args, **kwargs):
     sys.exit(code)
     return
 
-def check_vars(vars):
-    assert "default" in vars
-    return
-
 def format(st, rc, count):
     while count >= 0:
         nst = st.format(**rc)
@@ -146,7 +142,6 @@ def main():
     rcstring = open(configfile).read()
     rc = {}
     exec(rcstring, globals(), rc)
-    check_vars(rc)
     for config in configs:
         exec(config, globals(), rc)
         continue
@@ -159,8 +154,7 @@ def main():
             for dump in dumps:
                 if dump != section: continue
                 dumpFound = True
-                default = rc["default"]
-                default.update(rc[section])
+                default = rc[section]
                 print("{section} = {{".format(section=section))
                 for kk, vv in default.items():
                     print("\t{kk} = {vv}".format(kk=kk, vv=vv))
@@ -171,8 +165,7 @@ def main():
         enable = section in enables
         disable = section in disables
         if len(enables) == 0 or enable:
-            default = rc["default"]
-            default.update(rc[section])
+            default = rc[section]
             try: defdisable = default[pydisable]
             except KeyError: defdisable = True
             if disable or (defdisable and not enable): continue
@@ -208,8 +201,7 @@ def main():
         if not os.path.exists(path):
             if section in includes:
                 exec(rcstring, globals(), rc)
-                default = rc["default"]
-                default.update(rc[section])
+                default = rc[section]
                 makefunction = makecommand = None
                 try: makecommand = default[pymakecommand]
                 except KeyError:
@@ -235,8 +227,7 @@ def main():
             with pd.pushd(path): doinclude = include(verbose, debug, path)
             if doinclude:
                 with pd.pushd(path): exec(rcstring, globals(), rc)
-                default = rc["default"]
-                default.update(rc[possible])
+                default = rc[possible]
                 if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
                     cmd = rest[0]
                     rem = rest[1:]
