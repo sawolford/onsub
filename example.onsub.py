@@ -33,6 +33,32 @@ default.update(defdefault)
 if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
 
+def gitmakecommand(verbose, debug, path, *rest):
+    assert len(rest) >= 1
+    url = rest[0]
+    cmd = "git clone {url} {path}".format(path=path, url=url)
+    if debug: print(cmd)
+    return cmd
+
+gitdefault = {
+    "py:include": lambda verbose, debug, path: os.path.exists(".git"),
+    "py:makecommand": gitmakecommand,
+    "cmd": "git",
+    "get": "{cmd} pull",
+    "remotes": "{cmd} remote -v",
+    "allremotes": "{remotes}",
+}
+
+gitlinux = {}
+gitwindows = {}
+
+git = {}
+git.update(default)
+git.update(gitdefault)
+if os.name == "nt": git.update(gitwindows)
+else: git.update(gitlinux)
+git["py:enable"] = True
+
 def hgmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
     rrev = ""
@@ -65,32 +91,6 @@ hg.update(hgdefault)
 if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
 hg["py:enable"] = True
-
-def gitmakecommand(verbose, debug, path, *rest):
-    assert len(rest) >= 1
-    url = rest[0]
-    cmd = "git clone {url} {path}".format(path=path, url=url)
-    if debug: print(cmd)
-    return cmd
-
-gitdefault = {
-    "py:include": lambda verbose, debug, path: os.path.exists(".git"),
-    "py:makecommand": gitmakecommand,
-    "cmd": "git",
-    "get": "{cmd} pull",
-    "remotes": "{cmd} remote -v",
-    "allremotes": "{remotes}",
-}
-
-gitlinux = {}
-gitwindows = {}
-
-git = {}
-git.update(default)
-git.update(gitdefault)
-if os.name == "nt": git.update(gitwindows)
-else: git.update(gitlinux)
-git["py:enable"] = True
 
 def svnmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1

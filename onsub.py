@@ -51,6 +51,10 @@ def cdwork(path, cmd, section, verbose, debug, cd):
     with pd.pushd(cd): rv = work(path, cmd, section, verbose, debug)
     return rv
 
+def color(nocolor, colors, color):
+    if nocolor: return None
+    return colors[color]
+
 class pyfuncfuture:
     def __init__(self, pheader, cheader, ec, out):
         self.pheader = pheader
@@ -77,6 +81,7 @@ def main():
     parser.add_argument("--dumpall", help="dump all sections", action="store_true", default=False)
     parser.add_argument("--enable", help="enabled sections", action="append")
     parser.add_argument("--file", help="file with folder names", action="append")
+    parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=False)
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
     parser.add_argument("--noop", help="no command execution", action="store_true")
     parser.add_argument("--py:include", dest="pyinclude", help="key for py:include", type=str, default="py:include")
@@ -110,6 +115,7 @@ def main():
     if args.enable: enables = args.enable
     files = []
     if args.file: files = args.file
+    nocolor = args.nocolor
     suppress = args.suppress
     verbose = args.verbose
     workers = args.workers
@@ -143,6 +149,7 @@ def main():
             return
         pass
     
+    if not os.path.exists(configfile): error(256 - 2, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
     rcstring = open(configfile).read()
     rc = {}
     exec(rcstring, globals(), rc)
@@ -170,11 +177,11 @@ def main():
         except KeyError: defenable = False
         if ((noenable or not defenable) and not enable) or disable: continue
         try: include = default[pyinclude]
-        except KeyError: error(256 - 2, 'No {pyinclude} key in {section} section'.format(pyinclude=pyinclude, section=section))
+        except KeyError: error(256 - 3, 'No {pyinclude} key in {section} section'.format(pyinclude=pyinclude, section=section))
         includes[section] = include
         continue
     if len(dumps) > 0:
-        if not dumpFound: error(256 - 3, "No matching sections found")
+        if not dumpFound: error(256 - 4, "No matching sections found")
         return 0
 
     colors = {
@@ -205,7 +212,7 @@ def main():
                 try: makecommand = default[pymakecommand]
                 except KeyError:
                     try: makefunction = default[pymakefunction]
-                    except: error(256 - 4, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+                    except: error(256 - 5, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                     pass
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
@@ -233,7 +240,7 @@ def main():
                     pheader = "{path} ({possible})".format(path=path, possible=possible)
                     cheader = "{cmd}".format(cmd=cmd)
                     try: pyfunc = default[cmd]
-                    except KeyError: error(256 - 5, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
+                    except KeyError: error(256 - 6, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
                     with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, *rem)
                     future = pyfuncfuture(pheader, cheader, ec, out)
                     pass
@@ -256,26 +263,26 @@ def main():
     for pheader, cheader, ec, out in results:
         if ec: nerrors += 1
         if verbose >= 3:
-            tc.cprint(pheader, colors["path"], end="")
+            tc.cprint(pheader, color(nocolor, colors, "path"), end="")
             tc.cprint(" ", end="")
-            tc.cprint(cheader, colors["command"])
+            tc.cprint(cheader, color(nocolor, colors, "command"))
             pass
         if verbose >= 2:
-            if ec: tc.cprint(out, colors["bad"])
-            else: tc.cprint(out, colors["good"])
+            if ec: tc.cprint(out, color(nocolor, colors, "bad"))
+            else: tc.cprint(out, color(nocolor, colors, "good"))
             pass
         continue
 
     if not suppress and verbose >= 1 and nerrors > 0:
-        tc.cprint("<<< ERRORS >>>", colors["partition"])
+        tc.cprint("<<< ERRORS >>>", color(nocolor, colors, "partition"))
         for pheader, cheader, ec, out in results:
             if not ec: continue
-            tc.cprint("({ec})".format(ec=ec), colors["error"], end="")
+            tc.cprint("({ec})".format(ec=ec), color(nocolor, colors, "error"), end="")
             tc.cprint(" ", end="")
-            tc.cprint(pheader, colors["path"], end="")
+            tc.cprint(pheader, color(nocolor, colors, "path"), end="")
             tc.cprint(" ", end="")
-            tc.cprint(cheader, colors["command"])
-            tc.cprint(out, colors["error"])
+            tc.cprint(cheader, color(nocolor, colors, "command"))
+            tc.cprint(out, color(nocolor, colors, "error"))
             continue
         pass
     return nerrors
@@ -283,5 +290,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = onsub.main()
-    if rv >= 250: print("Errors exceed 250", file=sys.stderr)
+    if rv >= 249: print("Errors exceed 249", file=sys.stderr)
     sys.exit(rv)
