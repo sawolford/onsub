@@ -64,26 +64,28 @@ class pyfuncfuture:
 def main():
     signal.signal(signalnum = signal.SIGINT, handler = signal.SIG_DFL)
     if os.name == "nt": os.system("color")
-    fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=32)
-    parser = ap.ArgumentParser(description="Walks filesystem executing arbitrary commands", formatter_class=fc)
-    parser.add_argument("--command", help="Prefix {cmd}", action="store_true", default=False)
-    parser.add_argument("--config", help="Config option", action="append")
-    parser.add_argument("--configfile", help="Config file", type=str, default=f'{os.environ["HOME"]}/.onsub.py')
-    parser.add_argument("--count", help="Count for subsitutions", type=int, default=10)
-    parser.add_argument("--debug", help="Debug flag", action="store_true")
-    parser.add_argument("--depth", help="Walk depth", type=int, default=-1)
-    parser.add_argument("--dump", help="Dump section", action="append")
-    parser.add_argument("--disable", help="Disabled sections", action="append")
-    parser.add_argument("--enable", help="Enabled sections", action="append")
-    parser.add_argument("--file", help="File with folder names", action="append")
-    parser.add_argument("--noop", help="No command execution", action="store_true")
-    parser.add_argument("--py:include", dest="include", help="Key for py:include", type=str, default="py:include")
-    parser.add_argument("--py:makecommand", dest="pymakecommand", help="Key for py:makecommand", type=str, default="py:makecommand")
-    parser.add_argument("--py:makefunction", dest="pymakefunction", help="Key for py:makefunction", type=str, default="py:makefunction")
-    parser.add_argument("--py:disable", dest="pydisable", help="Key for py:disable", type=str, default="py:disable")
-    parser.add_argument("--suppress", help="Suppress repeated error output", action="store_true")
-    parser.add_argument("--verbose", help="Verbose level", type=int, default=4)
-    parser.add_argument("--workers", help="Number of workers", type=int, default=mp.cpu_count())
+    fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=36, width=120)
+    parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
+    parser.add_argument("--command", help="prefix {cmd}", action="store_true", default=False)
+    parser.add_argument("--config", help="config option", action="append")
+    parser.add_argument("--configfile", help="config file", type=str, default=f'{os.environ["HOME"]}/.onsub.py')
+    parser.add_argument("--count", help="count for substitutions", type=int, default=10)
+    parser.add_argument("--debug", help="debug flag", action="store_true")
+    parser.add_argument("--depth", help="walk depth", type=int, default=-1)
+    parser.add_argument("--disable", help="disabled sections", action="append")
+    parser.add_argument("--dump", help="dump section", action="append")
+    parser.add_argument("--dumpall", help="dump all sections", action="store_true", default=False)
+    parser.add_argument("--enable", help="enabled sections", action="append")
+    parser.add_argument("--file", help="file with folder names", action="append")
+    parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
+    parser.add_argument("--noop", help="no command execution", action="store_true")
+    parser.add_argument("--py:include", dest="pyinclude", help="key for py:include", type=str, default="py:include")
+    parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str, default="py:makecommand")
+    parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str, default="py:makefunction")
+    parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str, default="py:enable")
+    parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
+    parser.add_argument("--verbose", help="verbose level", type=int, default=4)
+    parser.add_argument("--workers", help="number of workers", type=int, default=mp.cpu_count())
     parser.add_argument("rest", nargs=ap.REMAINDER)
     args = parser.parse_args()
     command = []
@@ -96,10 +98,12 @@ def main():
     if args.config: configs = args.config
     count = args.count
     debug = args.debug
+    noenable = args.noenable
     depth = args.depth
     dumps = []
     if args.dump: dumps = args.dump
-    if not noop and len(dumps) == 0 and len(args.rest) < 1: error(256 - 1, "Not enough command arguments")
+    dumpall = args.dumpall
+    if not noop and not dumpall and len(dumps) == 0 and len(args.rest) < 1: error(256 - 1, "Not enough command arguments")
     disables = []
     if args.disable: disables = args.disable
     enables = []
@@ -109,10 +113,10 @@ def main():
     suppress = args.suppress
     verbose = args.verbose
     workers = args.workers
-    pyinclude = args.include
+    pyinclude = args.pyinclude
     pymakefunction = args.pymakefunction
     pymakecommand = args.pymakecommand
-    pydisable = args.pydisable
+    pyenable = args.pyenable
 
     paths = {}
     for file in files:
@@ -150,29 +154,24 @@ def main():
     for section, vv in rc.items():
         if section == "colors": continue
         if type(rc[section]) != type({}): continue
-        if len(dumps) > 0:
-            for dump in dumps:
-                if dump != section: continue
-                dumpFound = True
-                default = rc[section]
-                print("{section} = {{".format(section=section))
-                for kk, vv in default.items():
-                    print("\t{kk} = {vv}".format(kk=kk, vv=vv))
-                    continue
-                print("}")
+        if dumpall or section in dumps:
+            dumpFound = True
+            default = rc[section]
+            print("{section} = {{".format(section=section))
+            for kk, vv in default.items():
+                print("\t{kk} = {vv}".format(kk=kk, vv=vv))
                 continue
+            print("}")
             continue
         enable = section in enables
         disable = section in disables
-        if len(enables) == 0 or enable:
-            default = rc[section]
-            try: defdisable = default[pydisable]
-            except KeyError: defdisable = True
-            if disable or (defdisable and not enable): continue
-            try: include = default[pyinclude]
-            except KeyError: error(256 - 2, 'No {pyinclude} key in {section} section'.format(pyinclude=pyinclude, section=section))
-            includes[section] = include
-            pass
+        default = rc[section]
+        try: defenable = default[pyenable]
+        except KeyError: defenable = False
+        if ((noenable or not defenable) and not enable) or disable: continue
+        try: include = default[pyinclude]
+        except KeyError: error(256 - 2, 'No {pyinclude} key in {section} section'.format(pyinclude=pyinclude, section=section))
+        includes[section] = include
         continue
     if len(dumps) > 0:
         if not dumpFound: error(256 - 3, "No matching sections found")

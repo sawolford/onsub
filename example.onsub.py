@@ -64,7 +64,7 @@ hg.update(default)
 hg.update(hgdefault)
 if os.name == "nt": hg.update(hgwindows)
 else: hg.update(hglinux)
-hg["py:disable"] = False
+hg["py:enable"] = True
 
 def gitmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -90,7 +90,7 @@ git.update(default)
 git.update(gitdefault)
 if os.name == "nt": git.update(gitwindows)
 else: git.update(gitlinux)
-git["py:disable"] = False
+git["py:enable"] = True
 
 def svnmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -118,7 +118,7 @@ svn.update(default)
 svn.update(svndefault)
 if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
-svn["py:disable"] = False
+svn["py:enable"] = True
 
 def everymakefunction(verbose, debug, path, *rest):
     if verbose >=4: print("os.makedirs({path})".format(path=path))
@@ -138,8 +138,3 @@ every.update(default)
 every.update(everydefault)
 if os.name == "nt": every.update(everywindows)
 else: every.update(everylinux)
-every["py:disable"] = True
-
-none = {
-    "py:include": lambda verbose, debug, path: False,
-}
