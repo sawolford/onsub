@@ -7,7 +7,18 @@ colors = {
 #     "partition": "yellow",
 }
 
-defdefault = {}
+def fileCheck(verbose, debug, path, *args):
+    if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
+    fname = args[0]
+    if verbose >= 4: print("os.path.exists({fname})".format(fname=fname))
+    exists = os.path.exists(fname)
+    fpath = "{path}/{fname}".format(path=path, fname=fname)
+    if exists: return 0, "{fpath} exists".format(fpath=fpath)
+    return 1, "{fpath} does not exist".format(fpath=fpath)
+
+defdefault = {
+    "py:fileCheck": fileCheck,
+}
 
 deflinux = {
     "echo": "/bin/echo",
@@ -21,16 +32,6 @@ default = {}
 default.update(defdefault)
 if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
-default["py:disable"] = False
-
-def fileCheck(verbose, debug, path, *args):
-    if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
-    fname = args[0]
-    if verbose >= 4: print("os.path.exists({fname})".format(fname=fname))
-    exists = os.path.exists(fname)
-    fpath = "{path}/{fname}".format(path=path, fname=fname)
-    if exists: return 0, "{fpath} exists".format(fpath=fpath)
-    return 1, "{fpath} does not exist".format(fpath=fpath)
 
 def hgmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
@@ -46,7 +47,6 @@ hgdefault =  {
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
     "get": "{cmd} pull --update",
-    "py:fileCheck": fileCheck,
 }
 
 hglinux = {
@@ -79,7 +79,6 @@ gitdefault = {
     "get": "{cmd} pull",
     "remotes": "{cmd} remote -v",
     "allremotes": "{remotes}",
-    "py:fileCheck": fileCheck,
 }
 
 gitlinux = {}
@@ -107,7 +106,6 @@ svndefault = {
     "get": "{cmd} up",
     "remotes": "{cmd} info --show-item url",
     "allremotes": "{remotes}",
-    "py:fileCheck": fileCheck,
 }
 
 svnlinux = {}
@@ -124,10 +122,19 @@ def everymakefunction(verbose, debug, path, *rest):
     os.makedirs(path)
     return 0, "os.makedirs({path})".format(path=path)
 
-every = {
+everydefault = {
     "py:include": lambda verbose, debug, path: True,
     "py:makefunction": everymakefunction,
 }
+
+everylinux = {}
+everywindows = {}
+
+every = {}
+every.update(everydefault)
+if os.name == "nt": every.update(everywindows)
+else: every.update(everylinux)
+every["py:disable"] = True
 
 none = {
     "py:include": lambda verbose, debug, path: False,

@@ -76,6 +76,7 @@ def main():
     parser.add_argument("--count", help="Count for subsitutions", type=int, default=10)
     parser.add_argument("--debug", help="Debug flag", action="store_true")
     parser.add_argument("--depth", help="Walk depth", type=int, default=-1)
+    parser.add_argument("--dump", help="Dump section", action="append")
     parser.add_argument("--disable", help="Disabled sections", action="append")
     parser.add_argument("--enable", help="Enabled sections", action="append")
     parser.add_argument("--file", help="File with folder names", action="append")
@@ -93,7 +94,6 @@ def main():
     if args.command: command = ["{cmd}"]
     noop = False
     if args.noop: noop = True
-    elif len(args.rest) < 1: error(256 - 1, "Not enough command arguments")
     rest = args.rest
     configfile = args.configfile
     configs = []
@@ -101,6 +101,9 @@ def main():
     count = args.count
     debug = args.debug
     depth = args.depth
+    dumps = []
+    if args.dump: dumps = args.dump
+    if not noop and len(dumps) == 0 and len(args.rest) < 1: error(256 - 1, "Not enough command arguments")
     disables = []
     if args.disable: disables = args.disable
     enables = []
@@ -148,20 +151,40 @@ def main():
         exec(config, globals(), rc)
         continue
     includes = {}
-    for kk, vv in rc.items():
-        if kk == "default" or kk == "colors": continue
-        if type(rc[kk]) != type({}): continue
-        enable = kk in enables
-        disable = kk in disables
+    dumpFound = False
+    for section, vv in rc.items():
+        if section == "colors": continue
+        if type(rc[section]) != type({}): continue
+        if len(dumps) > 0:
+            for dump in dumps:
+                if dump != section: continue
+                dumpFound = True
+                default = rc["default"]
+                default.update(rc[section])
+                print("{section} = {{".format(section=section))
+                for kk, vv in default.items():
+                    print("\t{kk} = {vv}".format(kk=kk, vv=vv))
+                    continue
+                print("}")
+                continue
+            continue
+        enable = section in enables
+        disable = section in disables
         if len(enables) == 0 or enable:
-            try: defdisable = rc[kk][pydisable]
+            default = rc["default"]
+            default.update(rc[section])
+            try: defdisable = default[pydisable]
             except KeyError: defdisable = True
             if disable or (defdisable and not enable): continue
-            try: include = rc[kk][pyinclude]
-            except KeyError: error(256 - 2, 'No {pyinclude} key in {kk} section'.format(pyinclude=pyinclude, kk=kk))
-            includes[kk] = include
+            try: include = default[pyinclude]
+            except KeyError: error(256 - 2, 'No {pyinclude} key in {section} section'.format(pyinclude=pyinclude, section=section))
+            includes[section] = include
             pass
         continue
+    if len(dumps) > 0:
+        if not dumpFound: error(256 - 3, "No matching sections found")
+        return 0
+
     colors = {
         "path": "blue",
         "command": "cyan",
@@ -188,10 +211,10 @@ def main():
                 default = rc["default"]
                 default.update(rc[section])
                 makefunction = makecommand = None
-                try: makecommand = rc[section][pymakecommand]
+                try: makecommand = default[pymakecommand]
                 except KeyError:
-                    try: makefunction = rc[section][pymakefunction]
-                    except: error(256 - 3, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+                    try: makefunction = default[pymakefunction]
+                    except: error(256 - 4, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                     pass
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
@@ -217,10 +240,10 @@ def main():
                 if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
                     cmd = rest[0]
                     rem = rest[1:]
-                    pheader = "{path} ({section})".format(path=path, section=section)
+                    pheader = "{path} ({possible})".format(path=path, possible=possible)
                     cheader = "{cmd}".format(cmd=cmd)
-                    try: pyfunc = rc[section][cmd]
-                    except KeyError: error(256 - 4, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
+                    try: pyfunc = default[cmd]
+                    except KeyError: error(256 - 5, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
                     with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, *rem)
                     future = pyfuncfuture(pheader, cheader, ec, out)
                     pass
@@ -270,5 +293,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = onsub.main()
-    if rv >= 251: print("Errors exceed 251", file=sys.stderr)
+    if rv >= 250: print("Errors exceed 250", file=sys.stderr)
     sys.exit(rv)
