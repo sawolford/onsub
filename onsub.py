@@ -76,10 +76,10 @@ def main():
     parser.add_argument("--count", help="count for substitutions", type=int, default=10)
     parser.add_argument("--debug", help="debug flag", action="store_true")
     parser.add_argument("--depth", help="walk depth", type=int, default=-1)
-    parser.add_argument("--disable", help="disabled sections", action="append")
+    parser.add_argument("--disable", help="disable section", action="append")
     parser.add_argument("--dump", help="dump section", action="append")
     parser.add_argument("--dumpall", help="dump all sections", action="store_true", default=False)
-    parser.add_argument("--enable", help="enabled sections", action="append")
+    parser.add_argument("--enable", help="enable section", action="append")
     parser.add_argument("--file", help="file with folder names", action="append")
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=False)
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
@@ -246,7 +246,7 @@ def main():
                     pass
                 else:
                     cmd = format(" ".join(command + args.rest), default, count)
-                    future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, path])
+                    future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, path])
                     pass
                 futures.append(future)
                 pass
@@ -289,6 +289,6 @@ def main():
 
 if __name__ == "__main__":
     mp.freeze_support()
-    rv = onsub.main()
+    rv = main()
     if rv >= 249: print("Errors exceed 249", file=sys.stderr)
     sys.exit(rv)

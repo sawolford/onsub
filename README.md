@@ -1,9 +1,7 @@
 # onsub.py
 [onsub.py v0.9](https://bitbucket.org/sawolford/onsub.git)
 ## Summary
-The onsub.py command iterates over subfolders to execute arbitrary commands as dictated by command line arguments and a Python configuration file. The main code consists of 2 Python files: an example Python-configuration file that is meant to be user configurable and the onsub.py script that executes commands as dictated by command line arguments and the configuration file.
-## Configuration
-The default configuration file is located at `${HOME}/.onsub.py`. A partially functional [example configuration file](https://bitbucket.org/sawolford/onsub/src/master/example.onsub.py) provides sample commands for [Git](https://git-scm.com/), [Mercurial](https://www.mercurial-scm.org/) and [Subversion](https://subversion.apache.org/). It also contains a section (named "every") that will allow operations on all subfolders regardless of type.
+The onsub.py command iterates over subfolders to execute arbitrary commands as dictated by command line arguments and a Python configuration file. The main code consists of two (2) Python files: an example Python-configuration file that is meant to be user configurable and the onsub.py script that executes commands as dictated by command line arguments and the configuration file.
 
 All provided files, with a short descrption, are:
 
@@ -13,10 +11,79 @@ All provided files, with a short descrption, are:
 	- example.onsub.py    -- config file that implements hg, git, svn behavior
 	- guestrepo2onsub.py  -- converter from guestrepo to onsub syntax
 	- README.md           -- this file
+The configuration file is described later but it is organized into sections and provides rules for operation. The`onsub` command can be run in two main modes: file mode and recurse mode.
+
+The first is file mode, where a special file is provided indicating which subfolders are to be visited and, optionally, information about how to create them if they are missing. If this triggers folder creation because an expected folder is not there, then the folder creation is run serially to ensure that the expected onsub command has a folder to run in. If no command is provided (i.e., noop), then the folder creations will be run in parallel. If the creation operations cannot be run in parallel, then the creation operations can be specified differently to ensure order is maintained.
+
+File mode is indicated by the `--file FILE` command line argument. The `FILE` parameter indicates the input file of expected folders, grouped by section (described below), and, optionally, additional arguments for each expected folder. If the `--noop` command line argument is provided, then this mode can be used to construct all of the folders described by `FILE` in parallel according to rules for the corresponding section in the configuration file.  Example:
+
+	git = [
+		("./onsub", "https://bitbucket.org/sawolford/onsub.git"),
+	]
+
+The second is recurse mode, where the filesystem is recursively searched, infinitely or up to a given depth. The configuration code is then queried for each folder in order to see if the `onsub` command should execute a command in that folder. If the provided command indicates variable substitution is necessary, the configuration file can also specify rules for how the command is constructed.
+
+Recurse mode is indicated by the lack of a `--file FILE` command line argument. Instead of iterating over provided folder names, `onsub` instead recurses through the file system to generate folders. Example:
+
+	$ onsub pwd
+Both modes will execute commands according to the provided command line arguments. Extensive examples are provided at the end but some simple examples capture the main ways that commands are provided on the `onsub` command line. Examples:
+
+	$ onsub --file input.py --noop    # constructs folders from input.py in parallel
+	$ onsub --file input.py {remotes} # constructs folders from input.py serially, then executes "{remotes}" command in each
+	$ onsub --command status          # recurses to all subfolders and runs "{cmd} status"
+	$ onsub pwd                       # recurses to all subfolders and runs "pwd"
+## Configuration
+The configuration file for `onsub` is nothing but a Python script, so it follows normal Python syntax rules. The code is interpreted by `onsub` as a color configuration list (`colors`) and a set of Python dictionaries, each known as a section. The `colors` list instructs `onsub` how to colorize output. Each section is just a normal Python dictionary with keys and values. Sections are optional but, in the absence of extensive command line arguments, essentially required for onsub to do useful work.
+
+The section names and most of the contents are arbitrary but are interpreted by `onsub` in such a way that work may be performed on file folders. Most dictionary keys in a section entry are completely arbitrary and will be passed to the Python string.format() function in order to construct shell commands. This formatting process is repeated a set number of times or until the string is not being modified anymore. If a key is prefixed by `py:`, then the value is instead interpreted as a Python function whose arguments are prescribed for certain keys (described below) or just a list of remaining command line arguments.
+
+Dictionary entry keys are interpreted specially by `onsub`:
+#### - `py:enable`
+Must evaluate to `True` or `False`. Indicates that the section is to be interpreted directly by `onsub`. Setting this to `False` can be used to construct sections that are then enabled themselves. Defaults to False. Example:
+
+	git["py:enable"] = True
+#### - `py:include`
+Python function taking threee (3) arguments: `verbose`, `debug`, `path`. The first two are flags that can be used to control output. The last is the path that should be checked to see if the section applies. The current working directory context for this function call is also set to `path`. The function should return `True` if the section applies and return `False` if the section doest not apply. Required for any enabled section. Example:
+
+	lambda verbose, debug, path: os.path.exists(".git")
+#### - `py:makecommand`
+Python function taking four (4) arguments: `verbose`, `debug`, `path`, `*rest`. The first two are flags that can be used to control output. The third is the path that does not exist and needs to be created. The last is a list for accepting a variable number of arguments. These variable arguments are taken from an input file (described later) and should typically contain additional instructions for constructing a missing folder. The function should return a string that evaluates to a shell command. This shell command may be executed in parallel if there's no other command provided to `onsub` (i.e., noop). Required if construction is requested and `py:makefunction` is not set (`py:makecommand` takes precedence over `py:makefunction`). Exanple:
+
+	def gitmakecommand(verbose, debug, path, *rest):
+		assert len(rest) >= 1
+		url = rest[0]
+		cmd = "git clone {url} {path}".format(path=path, url=url)
+		if debug: print(cmd)
+		return cmd
+#### - `py:makefunction` 
+Python function taking four (4) arguments: `verbose`, `debug`, `path`, `*rest`. The first two are flags that can be used to control output. The third is the path that does not exist and needs to be created. The last is a list for accepting a variable number of arguments. These variable arguments are taken from an input file (described later) and should typically contain additional instructions for constructing a missing folder. The function should perform the necessary operation to construct a missing folder and should return a tuple consisting of an error code and an output string. This command will not be executed in parallel due to limitations of Python multiprocessing. Required if construction is requested and `py:makecommand` is not set. Example:
+
+	def everymakefunction(verbose, debug, path, *rest):
+		if verbose >=4: print("os.makedirs({path})".format(path=path))
+		os.makedirs(path)
+		return 0, "os.makedirs({path})".format(path=path)
+#### - string.format() strings
+Other dictionary entries are strings that can contain Python variable substitution specifiers compatible with the Python `string.format()` standard method. Variables are substituted from the same section dictinoary. This variable substitution is performed iteratively a set number of times or until the string no longer changes. Example:
+
+	"cmd": "git"
+	"-v": "-v"
+	"remotes": "{cmd} remote {-v}"
+### Final configuration
+Since the configuration file is just normal Python code, complex configurations can be constructed. Python allows a dictionary to be updated from another dictionary, where only keys in the other dictionary are replaced in the original. Checks against operating system type can be performed to alter behavior depending on the underlying OS. The resultant dictionary, if enabled, is the only one that will be interpreted by `onsub`. Example:
+
+	git = {}
+	git.update(default)
+	git.update(gitdefault)
+	if os.name == "nt": git.update(gitwindows)
+	else: git.update(gitlinux)
+	git["py:enable"] = True
+The default configuration file is located at `${HOME}/.onsub.py`. A partially functional [example configuration file](https://bitbucket.org/sawolford/onsub/src/master/example.onsub.py) provides sample commands for [Git](https://git-scm.com/), [Mercurial](https://www.mercurial-scm.org/) and [Subversion](https://subversion.apache.org/). It also contains a section (named "every") that will allow operations on all subfolders regardless of type.
 
 ### Details
-#### Pseudo-section `colors`
+#### - Pseudo-section `colors`
 Colors to use in colorized output. Commented lines indicate default values for each type of output.
+
+Value:
 
 	colors = {
 	#     "path": "blue",
@@ -26,7 +93,15 @@ Colors to use in colorized output. Commented lines indicate default values for e
 	#     "error": "red",
 	#     "partition": "yellow",
 	}
-#### Pseudo-section `default`
+Explanation:
+
+	path       -- Folder where command is executed
+	command    -- Command that is executed
+	good       -- Output, if error code of command is zero
+	bad        -- Output, if error code of command is non-zero
+	error      -- Final output repeated for those commands with non-zero error code
+	partition  -- Separator between normal output and repeated error output
+#### - Pseudo-section `default`
 The example `default` section provides some sample Linux commands and a sample Python operation function.
 ##### `default` summary
 	fileCheck   -- Python helper function that checks if a file exists in a folder
@@ -43,13 +118,12 @@ Composite:
         lswcl = ls | wc -l
         cwd = <current working directory>
 	}
-
 Explanation:
 
-	py:fileCheck  -- 
-	echo          -- 
-	lswcl         -- 
-	cwd           -- 
+	py:fileCheck  -- Python helper function that checks if a file exists in a folder
+	echo          -- Path to echo command
+	lswcl         -- Executes ls and counts the number of lines
+	cwd           -- Python f-string that evaluates to the current working directory
 ##### `default` details
 	def fileCheck(verbose, debug, path, *args):
     	if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
@@ -76,7 +150,7 @@ Explanation:
 	default.update(defdefault)
 	if os.name =="nt": default.update(defwindows)
 	else: default.update(deflinux)
-#### Section `git`
+#### - Section `git`
 The example `git` section provides sample `git` commands.
 ##### `git` summary
 	gitmakecommand  -- Python helper function that makes a git clone
@@ -139,7 +213,7 @@ Explanation:
 	if os.name == "nt": git.update(gitwindows)
 	else: git.update(gitlinux)
 	git["py:enable"] = True
-#### Section `hg`
+#### - Section `hg`
 The example `hg` section provides sample `hg` commands.
 ##### `hg` summary
 	hgmakecommand  -- Python helper function that makes an hg clone
@@ -209,7 +283,7 @@ Explanation:
 	if os.name == "nt": hg.update(hgwindows)
 	else: hg.update(hglinux)
 	hg["py:enable"] = True
-#### Section `svn`
+#### - Section `svn`
 The example `svn` section provides some sample Linux commands and a sample Python operation function.
 ##### `svn` summary
 	svnmakecommand  -- Python helper function that makes an svn checkout
@@ -274,7 +348,7 @@ Explanation:
 	if os.name == "nt": svn.update(svnwindows)
 	else: svn.update(svnlinux)
 	svn["py:enable"] = True
-#### Section `every`
+#### - Section `every`
 The example `every ` section provides some sample Linux commands and a sample Python operation function.
 ##### `every ` summary
 	everymakefunction  -- Python helper function that makes a folder
@@ -517,7 +591,7 @@ Option: `WORKERS`<br>
 Repeate: No<br><br>
 Sets the number of simultaneous worker processes to use.
 ## Examples
-Examples of using onsub are below. The config file is assumed to be [example.onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example.onsub.py) and it is executed on a Linux workstation. The directory structure is assumed to be the following:
+Examples of using onsub are below. The configuration file is assumed to be [example.onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example.onsub.py) and it is executed on a Linux workstation. The directory structure is assumed to be the following:
 
 	git/
 	git/.git
