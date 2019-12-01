@@ -84,10 +84,10 @@ def main():
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=False)
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
     parser.add_argument("--noop", help="no command execution", action="store_true")
-    parser.add_argument("--py:include", dest="pyinclude", help="key for py:include", type=str, default="py:include")
+    parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str, default="py:enable")
     parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str, default="py:makecommand")
     parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str, default="py:makefunction")
-    parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str, default="py:enable")
+    parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str, default="py:priority")
     parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
     parser.add_argument("--verbose", help="verbose level", type=int, default=4)
     parser.add_argument("--workers", help="number of workers", type=int, default=mp.cpu_count())
@@ -119,13 +119,14 @@ def main():
     suppress = args.suppress
     verbose = args.verbose
     workers = args.workers
-    pyinclude = args.pyinclude
+    pyenable = args.pyenable
     pymakefunction = args.pymakefunction
     pymakecommand = args.pymakecommand
-    pyenable = args.pyenable
+    pypriority = args.pypriority
 
     paths = {}
     for file in files:
+        if not os.path.exists(file): error(256 - 2, 'Input file {file} does not exist'.format(file=file))
         rc = {}
         exec(open(file).read(), globals(), rc)
         for section in rc:
@@ -149,14 +150,14 @@ def main():
             return
         pass
     
-    if not os.path.exists(configfile): error(256 - 2, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
+    if not os.path.exists(configfile): error(256 - 3, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
     rcstring = open(configfile).read()
     rc = {}
     exec(rcstring, globals(), rc)
     for config in configs:
         exec(config, globals(), rc)
         continue
-    includes = {}
+    priorities = {}
     dumpFound = False
     for section, vv in rc.items():
         if section == "colors": continue
@@ -176,12 +177,12 @@ def main():
         try: defenable = default[pyenable]
         except KeyError: defenable = False
         if ((noenable or not defenable) and not enable) or disable: continue
-        try: include = default[pyinclude]
-        except KeyError: error(256 - 3, 'No {pyinclude} key in {section} section'.format(pyinclude=pyinclude, section=section))
-        includes[section] = include
+        try: priority = default[pypriority]
+        except KeyError: error(256 - 4, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
+        priorities[section] = priority
         continue
     if len(dumps) > 0:
-        if not dumpFound: error(256 - 4, "No matching sections found")
+        if not dumpFound: error(256 - 5, "No matching sections found")
         return 0
 
     colors = {
@@ -205,14 +206,14 @@ def main():
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         if not os.path.exists(path):
-            if section in includes:
+            if section in priorities:
                 exec(rcstring, globals(), rc)
                 default = rc[section]
                 makefunction = makecommand = None
                 try: makecommand = default[pymakecommand]
                 except KeyError:
                     try: makefunction = default[pymakefunction]
-                    except: error(256 - 5, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+                    except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                     pass
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
@@ -228,31 +229,36 @@ def main():
                 future.result()
                 pass
             pass
-        for possible, include in includes.items():
+
+        maxpriority = (0, "")
+        for possible, priority in priorities.items():
             if section and section != possible: continue
-            with pd.pushd(path): doinclude = include(verbose, debug, path)
-            if doinclude:
-                with pd.pushd(path): exec(rcstring, globals(), rc)
-                default = rc[possible]
-                if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
-                    cmd = rest[0]
-                    rem = rest[1:]
-                    pheader = "{path} ({possible})".format(path=path, possible=possible)
-                    cheader = "{cmd}".format(cmd=cmd)
-                    try: pyfunc = default[cmd]
-                    except KeyError: error(256 - 6, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
-                    with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, *rem)
-                    future = pyfuncfuture(pheader, cheader, ec, out)
-                    pass
-                else:
-                    cmd = format(" ".join(command + args.rest), default, count)
-                    future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, path])
-                    pass
-                futures.append(future)
+            with pd.pushd(path): pvalue = priority(verbose, debug, path)
+            if pvalue > maxpriority[0]:
+                maxpriority = (pvalue, possible)
                 pass
             continue
+        if maxpriority[0] == 0: continue
+        possible = maxpriority[1]
+        with pd.pushd(path): exec(rcstring, globals(), rc)
+        default = rc[possible]
+        if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
+            cmd = rest[0]
+            rem = rest[1:]
+            pheader = "{path} ({possible})".format(path=path, possible=possible)
+            cheader = "{cmd}".format(cmd=cmd)
+            try: pyfunc = default[cmd]
+            except KeyError: error(256 - 7, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
+            with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, *rem)
+            future = pyfuncfuture(pheader, cheader, ec, out)
+            pass
+        else:
+            cmd = format(" ".join(command + args.rest), default, count)
+            future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, path])
+            pass
+        futures.append(future)
         continue
-
+        
     results = []
     for future in futures:
         pheader, cheader, ec, out = future.result()
@@ -290,5 +296,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = main()
-    if rv >= 249: print("Errors exceed 249", file=sys.stderr)
+    if rv >= 248: print("Errors exceed 248", file=sys.stderr)
     sys.exit(rv)

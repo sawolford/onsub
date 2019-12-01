@@ -42,10 +42,10 @@ Dictionary entry keys are interpreted specially by `onsub`:
 Must evaluate to `True` or `False`. Indicates that the section is to be interpreted directly by `onsub`. Setting this to `False` can be used to construct sections that are then enabled themselves. Defaults to False. Example:
 
 	git["py:enable"] = True
-#### - `py:include`
-Python function taking threee (3) arguments: `verbose`, `debug`, `path`. The first two are flags that can be used to control output. The last is the path that should be checked to see if the section applies. The current working directory context for this function call is also set to `path`. The function should return `True` if the section applies and return `False` if the section doest not apply. Required for any enabled section. Example:
+#### - `py:priority`
+Python function taking threee (3) arguments: `verbose`, `debug`, `path`. The first two are flags that can be used to control output. The last is the path that should be checked to see if the section applies. The current working directory context for this function call is also set to `path`. The function should return zero if the section does not apply and return a non-zero priority if the section applies. Required for any enabled section. Example:
 
-	lambda verbose, debug, path: os.path.exists(".git")
+	lambda verbose, debug, path: 1 if os.path.exists(".git") else o
 #### - `py:makecommand`
 Python function taking four (4) arguments: `verbose`, `debug`, `path`, `*rest`. The first two are flags that can be used to control output. The third is the path that does not exist and needs to be created. The last is a list for accepting a variable number of arguments. These variable arguments are taken from an input file (described later) and should typically contain additional instructions for constructing a missing folder. The function should return a string that evaluates to a shell command. This shell command may be executed in parallel if there's no other command provided to `onsub` (i.e., noop). Required if construction is requested and `py:makefunction` is not set (`py:makecommand` takes precedence over `py:makefunction`). Exanple:
 
@@ -166,7 +166,7 @@ Composite:
         echo = /bin/echo
         lswcl = ls | wc -l
         cwd = <current working directory>
-        py:include = <function <lambda> at 0x106c3a830>
+        py:priority = <function <lambda> at 0x106c3a830>
         py:makecommand = <function gitmakecommand at 0x106c3a7a0>
         cmd = git
         get = {cmd} pull
@@ -180,7 +180,7 @@ Explanation:
 	echo            -- Inherited from default pseudo-section
 	lswcl           -- Inherited from default pseudo-section
 	cwd             -- Inherited from default pseudo-section
-	py:include      -- Python function that establishes a folder applies to this section
+	py:priority     -- Python function that establishes a folder applies to this section
 	py:makecommand  -- Python function that returns a shell command for cloning git folder
 	cmd             -- String that tells how to execute git
 	get             -- Command alias
@@ -196,7 +196,7 @@ Explanation:
 	    return cmd
 
 	gitdefault = {
-	    "py:include": lambda verbose, debug, path: os.path.exists(".git"),
+	    "py:priority": lambda verbose, debug, 4 if path: os.path.exists(".git") else 0,
 	    "py:makecommand": gitmakecommand,
 	    "cmd": "git",
 	    "get": "{cmd} pull",
@@ -229,7 +229,7 @@ Composite:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x1055dc950>
+		py:priority = <function <lambda> at 0x1055dc950>
 		py:makecommand = <function hgmakecommand at 0x1055dc8c0>
 		cmd = hg
 		get = {cmd} pull --update
@@ -243,7 +243,7 @@ Explanation:
 		echo            -- Inherited from default pseudo-section
 		lswcl           -- Inherited from default pseudo-section
 		cwd             -- Inherited from default pseudo-section
-		py:include      -- Python function that establishes a folder applies to this section
+		py:priority     -- Python function that establishes a folder applies to this section
 		py:makecommand  -- Python function that returns a shell command for cloning hg folder
 		cmd             -- String that tells how to execute hg
 		get             -- Command alias
@@ -261,7 +261,7 @@ Explanation:
 		return cmd
 
 	hgdefault =  {
-		"py:include": lambda verbose, debug, path: os.path.exists(".hg"),
+		"py:priority": lambda verbose, debug, path: 3 if os.path.exists(".hg") else 0,
 		"py:makecommand": hgmakecommand,
 		"cmd": "hg",
 		"get": "{cmd} pull --update",
@@ -299,7 +299,7 @@ Composite:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x10e7a0a70>
+		py:priority = <function <lambda> at 0x10e7a0a70>
 		py:makecommand = <function svnmakecommand at 0x10e7a09e0>
 		cmd = svn
 		get = {cmd} up
@@ -313,7 +313,7 @@ Explanation:
 		echo            -- Inherited from default pseudo-section
 		lswcl           -- Inherited from default pseudo-section
 		cwd             -- Inherited from default pseudo-section
-		py:include      -- Python function that establishes a folder applies to this section
+		py:priority     -- Python function that establishes a folder applies to this section
 		py:makecommand  -- Python function that returns a shell command for checking out svn folder
 		cmd             -- String that tells how to execute svn
 		get             -- Command alias
@@ -331,7 +331,7 @@ Explanation:
 		return cmd
 	
 	svndefault = {
-		"py:include": lambda verbose, debug, path: os.path.exists(".svn"),
+		"py:priority": lambda verbose, debug, path: 2 if os.path.exists(".svn") else 0,
 		"py:makecommand": svnmakecommand,
 		"cmd": "svn",
 		"get": "{cmd} up",
@@ -364,7 +364,7 @@ Composite:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x110831b90>
+		py:priority = <function <lambda> at 0x110831b90>
 		py:makefunction = <function everymakefunction at 0x110831b00>
 	}
 Explanation:
@@ -373,7 +373,7 @@ Explanation:
 	echo             -- Inherited from default pseudo-section
 	lswcl            -- Inherited from default pseudo-section
 	cwd              -- Inherited from default pseudo-section
-	py:include       -- Python function that establishes a folder applies to this section
+	py:priority      -- Python function that establishes a folder applies to this section
 	py:makefunction  -- Python function that makes a folder
 ##### `every ` details
 	def everymakefunction(verbose, debug, path, *rest):
@@ -382,7 +382,7 @@ Explanation:
 		return 0, "os.makedirs({path})".format(path=path)
 	
 	everydefault = {
-		"py:include": lambda verbose, debug, path: True,
+		"py:priority": lambda verbose, debug, path: 1,
 		"py:makefunction": everymakefunction,
 	}
 	
@@ -398,39 +398,39 @@ Explanation:
 The basic command line options, with variable outputs specified by <>, are:
 
 	usage: onsub [-h] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
-                 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--noenable] [--noop]
-                 [--py:include PYINCLUDE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
-                 [--py:enable PYENABLE] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
-                 ...
-   
-	Walks filesystem executing arbitrary commands
+				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
+				 [--noop] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
+				 [--py:priority PYPRIORITY] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
+				 ...
+	
+	walks filesystem executing arbitrary commands
 	
 	positional arguments:
-  		rest
+		rest
 	
 	optional arguments:
-  	  -h, --help                        show this help message and exit
-  	  --command                         prefix {cmd} (default: False)
-  	  --config CONFIG                   config option (default: None)
-  	  --configfile CONFIGFILE           config file (default: <home folder>/.onsub.py)
-  	  --count COUNT                     count for substitutions (default: 10)
-  	  --debug                           debug flag (default: False)
-  	  --depth DEPTH                     walk depth (default: -1)
-  	  --disable DISABLE                 disabled sections (default: None)
-  	  --dump DUMP                       dump section (default: None)
-  	  --dumpall                         dump all sections (default: False)
-	  --enable ENABLE                   enabled sections (default: None)
-  	  --file FILE                       file with folder names (default: None)
-  	  --nocolor                         disables colorized output (default: False)
-  	  --noenable                        no longer enable any sections (default: False)
-  	  --noop                            no command execution (default: False)
-  	  --py:include PYINCLUDE            key for py:include (default: py:include)
-  	  --py:makecommand PYMAKECOMMAND    key for py:makecommand (default: py:makecommand)
-  	  --py:makefunction PYMAKEFUNCTION  key for py:makefunction (default: py:makefunction)
-  	  --py:disable PYDISABLE            key for py:disable (default: py:disable)
-  	  --suppress                        suppress repeated error output (default: False)
-  	  --verbose VERBOSE                 verbose level (default: 4)
-  	  --workers WORKERS                 number of workers (default: <number of cores>)
+	  -h, --help                        show this help message and exit
+	  --command                         prefix {cmd} (default: False)
+	  --config CONFIG                   config option (default: None)
+	  --configfile CONFIGFILE           config file (default: /Users/swolford/.onsub.py)
+	  --count COUNT                     count for substitutions (default: 10)
+	  --debug                           debug flag (default: False)
+	  --depth DEPTH                     walk depth (default: -1)
+	  --disable DISABLE                 disable section (default: None)
+	  --dump DUMP                       dump section (default: None)
+	  --dumpall                         dump all sections (default: False)
+	  --enable ENABLE                   enable section (default: None)
+	  --file FILE                       file with folder names (default: None)
+	  --nocolor                         disables colorized output (default: False)
+	  --noenable                        no longer enable any sections (default: False)
+	  --noop                            no command execution (default: False)
+	  --py:enable PYENABLE              key for py:enable (default: py:enable)
+	  --py:makecommand PYMAKECOMMAND    key for py:makecommand (default: py:makecommand)
+	  --py:makefunction PYMAKEFUNCTION  key for py:makefunction (default: py:makefunction)
+	  --py:priority PYPRIORITY          key for py:priority (default: py:priority)
+	  --suppress                        suppress repeated error output (default: False)
+	  --verbose VERBOSE                 verbose level (default: 4)
+	  --workers WORKERS                 number of workers (default: 12)
 ### -h, --help
 	-h, --help                        show this help message and exit
 Type: Flag<br>
@@ -536,13 +536,13 @@ Default: False<br>
 Option: \<none><br>
 Repeat: No<br><br>
 Indicates that no command should be run in any folder. This can be useful when folders will be generated because of `--file FILE` command line option. Since no command is run, the folder generation can be run in parallel.
-### --py:include PYINCLUDE
-	--py:include INCLUDE              key for py:include (default: py:include)
+### --py:enable PYENABLE
+	--py:enable PYENABLE            key for py:enable (default: py:enable)
 Type: Option<br>
-Default: py:include<br>
-Option: `PYINCLUDE`<br>
+Default: py:enable<br>
+Option: `PYENABLE `<br>
 Repeat: No<br><br>
-Names `PYINCLUDE` as the key to look up in each configuration section for checking to see if a section applies to a folder.
+Names `PYENABLE ` as the key to look up in each configuration section for determining if the section is enabled by default.
 ### --py:makecommand PYMAKECOMMAND
 	--py:makecommand PYMAKECOMMAND    key for py:makecommand (default: py:makecommand)
 Type: Option<br>
@@ -557,13 +557,13 @@ Default: py:makefunction<br>
 Option: `PYMAKEFUNCTION`<br>
 Repeat: No<br><br>
 Names `PYMAKEFUNCTION` as the key to look up in each configuration section for executing python commands to make folders.
-### --py:enable PYENABLE
-	--py:enable PYENABLE            key for py:enable (default: py:enable)
+### --py:pypriority PYPRIORITY
+	--py:pypriority PYPRIORITY              key for py:priority (default: py:priority)
 Type: Option<br>
-Default: py:enable<br>
-Option: `PYENABLE `<br>
+Default: py:priority<br>
+Option: `PYPRIORITY `<br>
 Repeat: No<br><br>
-Names `PYENABLE ` as the key to look up in each configuration section for determining if the section is enabled by default.
+Names `PYPRIORITY` as the key to look up in each configuration section for checking to see if a section applies to a folder.
 ### --suppress
 	--suppress                        suppress repeated error output (default: False)
 Type: Flag<br>
@@ -606,12 +606,11 @@ Due to the limited quoting ability of the Windows `CMD.EXE` command shell, some 
 With no arguments:
 
 	usage: onsub [-h] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
-                 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--noenable] [--noop]
-                 [--py:include PYINCLUDE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
-                 [--py:enable PYENABLE] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
-                 ...
+				   [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
+				   [--noop] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
+				   [--py:priority PYPRIORITY] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
+				   ...
 	onsub: error: argument --dump: expected one argument
-
 
 With `--dump default`:
 
@@ -631,7 +630,7 @@ With `--dump hg`:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x10b476950>
+		py:py:priority = <function <lambda> at 0x10b476950>
 		py:makecommand = <function hgmakecommand at 0x10b4768c0>
 		cmd = hg
 		get = {cmd} pull --update
@@ -648,7 +647,7 @@ With `--dump git`:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x10fea5a70>
+		py:priority = <function <lambda> at 0x10fea5a70>
 		py:makecommand = <function gitmakecommand at 0x10fea59e0>
 		cmd = git
 		get = {cmd} pull
@@ -665,7 +664,7 @@ With `--dump svn`:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x10ff6fb90>
+		py:priority = <function <lambda> at 0x10ff6fb90>
 		py:makecommand = <function svnmakecommand at 0x10ff6fb00>
 		cmd = svn
 		get = {cmd} up
@@ -682,7 +681,7 @@ With `--dump every`:
 		echo = /bin/echo
 		lswcl = ls | wc -l
 		cwd = <current working directory>
-		py:include = <function <lambda> at 0x1045e2cb0>
+		py:priority = <function <lambda> at 0x1045e2cb0>
 		py:makefunction = <function everymakefunction at 0x1045e2c20>
 		py:enable = False
 	}

@@ -41,7 +41,7 @@ def gitmakecommand(verbose, debug, path, *rest):
     return cmd
 
 gitdefault = {
-    "py:include": lambda verbose, debug, path: os.path.exists(".git"),
+    "py:priority": lambda verbose, debug, path: 4 if os.path.exists(".git") else 0,
     "py:makecommand": gitmakecommand,
     "cmd": "git",
     "get": "{cmd} pull",
@@ -69,7 +69,7 @@ def hgmakecommand(verbose, debug, path, *rest):
     return cmd
 
 hgdefault =  {
-    "py:include": lambda verbose, debug, path: os.path.exists(".hg"),
+    "py:priority": lambda verbose, debug, path: 3 if os.path.exists(".hg") else 0,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
     "get": "{cmd} pull --update",
@@ -102,7 +102,7 @@ def svnmakecommand(verbose, debug, path, *rest):
     return cmd
 
 svndefault = {
-    "py:include": lambda verbose, debug, path: os.path.exists(".svn"),
+    "py:priority": lambda verbose, debug, path: 2 if os.path.exists(".svn") else 0,
     "py:makecommand": svnmakecommand,
     "cmd": "svn",
     "get": "{cmd} up",
@@ -126,7 +126,7 @@ def everymakefunction(verbose, debug, path, *rest):
     return 0, "os.makedirs({path})".format(path=path)
 
 everydefault = {
-    "py:include": lambda verbose, debug, path: True,
+    "py:priority": lambda verbose, debug, path: 1,
     "py:makefunction": everymakefunction,
 }
 
