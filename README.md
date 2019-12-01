@@ -8,7 +8,7 @@ All provided files, with a short descrption, are:
 	- onsub.py            -- the main execution code (~300 lines)
 	- onsub               -- very short python script that calls onsub.py
 	- pushd.py            -- implements shell-like pushd capability (borrowed)
-	- example.onsub.py    -- config file that implements hg, git, svn behavior
+	- example,onsub.py    -- config file that implements hg, git, svn behavior
 	- guestrepo2onsub.py  -- converter from guestrepo to onsub syntax
 	- README.md           -- this file
 The configuration file is described later but it is organized into sections and provides rules for operation. The`onsub` command can be run in two main modes: file mode and recurse mode.
@@ -77,7 +77,7 @@ Since the configuration file is just normal Python code, complex configurations 
 	if os.name == "nt": git.update(gitwindows)
 	else: git.update(gitlinux)
 	git["py:enable"] = True
-The default configuration file is located at `${HOME}/.onsub.py`. A partially functional [example configuration file](https://bitbucket.org/sawolford/onsub/src/master/example.onsub.py) provides sample commands for [Git](https://git-scm.com/), [Mercurial](https://www.mercurial-scm.org/) and [Subversion](https://subversion.apache.org/). It also contains a section (named "every") that will allow operations on all subfolders regardless of type.
+The default configuration file is located at `${HOME}/.onsub.py`. A partially functional [example configuration file](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) provides sample commands for [Git](https://git-scm.com/), [Mercurial](https://www.mercurial-scm.org/) and [Subversion](https://subversion.apache.org/). It also contains a section (named "every") that will allow operations on all subfolders regardless of type.
 
 ### Details
 #### - Pseudo-section `colors`
@@ -399,8 +399,9 @@ The basic command line options, with variable outputs specified by <>, are:
 
 	usage: onsub [-h] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
 				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
-				 [--noop] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
-				 [--py:priority PYPRIORITY] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
+				 [--noop] [--py:closebrace PYCLOSEBRACE] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND]
+				 [--py:makefunction PYMAKEFUNCTION] [--py:openbrace PYOPENBRACE] [--py:priority PYPRIORITY] [--suppress]
+				 [--verbose VERBOSE] [--workers WORKERS]
 				 ...
 	
 	walks filesystem executing arbitrary commands
@@ -424,9 +425,11 @@ The basic command line options, with variable outputs specified by <>, are:
 	  --nocolor                         disables colorized output (default: False)
 	  --noenable                        no longer enable any sections (default: False)
 	  --noop                            no command execution (default: False)
+	  --py:closebrace PYCLOSEBRACE      key for py:closebrace (default: %])
 	  --py:enable PYENABLE              key for py:enable (default: py:enable)
 	  --py:makecommand PYMAKECOMMAND    key for py:makecommand (default: py:makecommand)
 	  --py:makefunction PYMAKEFUNCTION  key for py:makefunction (default: py:makefunction)
+	  --py:openbrace PYOPENBRACE        key for py:openbrace (default: %[)
 	  --py:priority PYPRIORITY          key for py:priority (default: py:priority)
 	  --suppress                        suppress repeated error output (default: False)
 	  --verbose VERBOSE                 verbose level (default: 4)
@@ -536,6 +539,13 @@ Default: False<br>
 Option: \<none><br>
 Repeat: No<br><br>
 Indicates that no command should be run in any folder. This can be useful when folders will be generated because of `--file FILE` command line option. Since no command is run, the folder generation can be run in parallel.
+### --py:closebrace PYCLOSEBRACE
+		  --py:closebrace PYCLOSEBRACE      key for py:closebrace (default: %])
+Type: Option<br>
+Default: %]<br>
+Option: `PYCLOSEBRACE`
+Repeat: No<br><br>
+Sets the substitution string for a literal close brace.
 ### --py:enable PYENABLE
 	--py:enable PYENABLE            key for py:enable (default: py:enable)
 Type: Option<br>
@@ -557,6 +567,13 @@ Default: py:makefunction<br>
 Option: `PYMAKEFUNCTION`<br>
 Repeat: No<br><br>
 Names `PYMAKEFUNCTION` as the key to look up in each configuration section for executing python commands to make folders.
+### --py:openbrace PYOPENBRACE
+		  --py:openbrace PYOPENBRACE      key for py:openbrace (default: %[)
+Type: Option<br>
+Default: %[<br>
+Option: `PYOPENBRACE`
+Repeat: No<br><br>
+Sets the substitution string for a literal open brace.
 ### --py:pypriority PYPRIORITY
 	--py:pypriority PYPRIORITY              key for py:priority (default: py:priority)
 Type: Option<br>
@@ -591,7 +608,7 @@ Option: `WORKERS`<br>
 Repeate: No<br><br>
 Sets the number of simultaneous worker processes to use.
 ## Examples
-Examples of using onsub are below. The configuration file is assumed to be [example.onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example.onsub.py) and it is executed on a Linux workstation. The directory structure is assumed to be the following:
+Examples of using onsub are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Linux workstation. The directory structure is assumed to be the following:
 
 	git/
 	git/.git
@@ -606,10 +623,11 @@ Due to the limited quoting ability of the Windows `CMD.EXE` command shell, some 
 With no arguments:
 
 	usage: onsub [-h] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
-				   [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
-				   [--noop] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
-				   [--py:priority PYPRIORITY] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
-				   ...
+				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
+				 [--noop] [--py:closebrace PYCLOSEBRACE] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND]
+				 [--py:makefunction PYMAKEFUNCTION] [--py:openbrace PYOPENBRACE] [--py:priority PYPRIORITY] [--suppress]
+				 [--verbose VERBOSE] [--workers WORKERS]
+				 ...
 	onsub: error: argument --dump: expected one argument
 
 With `--dump default`:

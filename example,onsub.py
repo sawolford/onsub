@@ -36,7 +36,7 @@ else: default.update(deflinux)
 def gitmakecommand(verbose, debug, path, *rest):
     assert len(rest) >= 1
     url = rest[0]
-    cmd = "git clone {url} {path}".format(path=path, url=url)
+    cmd = "git clone {url} {path}".format(url=url, path=path)
     if debug: print(cmd)
     return cmd
 
@@ -64,7 +64,7 @@ def hgmakecommand(verbose, debug, path, *rest):
     rrev = ""
     if len(rest) >= 2: rrev = "-r {rev}".format(rev=rest[1])
     url = rest[0]
-    cmd = "hg clone {url} {path} {rrev}".format(path=path, url=url, rrev=rrev)
+    cmd = "hg clone {url} {path} {rrev}".format(url=url, path=path, rrev=rrev)
     if debug: print(cmd)
     return cmd
 
@@ -97,7 +97,7 @@ def svnmakecommand(verbose, debug, path, *rest):
     rev = "head"
     if len(rest) >= 2: rev = rest[1]
     url = rest[0]
-    cmd = "svn checkout {url}@{rev} {path}".format(path=path, url=url, rev=rev)
+    cmd = "svn checkout {url}@{rev} {path}".format(url=url, path=path, rev=rev)
     if debug: print(cmd)
     return cmd
 
@@ -138,3 +138,6 @@ every.update(default)
 every.update(everydefault)
 if os.name == "nt": every.update(everywindows)
 else: every.update(everylinux)
+
+localpy = f"{HOME()}/.onsub,local.py"
+if os.path.exists(localpy): exec(open(localpy).read(), globals(), locals())

@@ -16,14 +16,14 @@ def error(code, *args, **kwargs):
     sys.exit(code)
     return
 
-def format(st, rc, count):
+def format(st, rc, openbrace, closebrace, count):
     while count >= 0:
         nst = st.format(**rc)
         if nst == st: break
         st = nst
         count -= 1
         continue
-    return st
+    return st.replace(openbrace, "{").replace(closebrace, "}")
 
 def mysystem(cmd):
     try:
@@ -65,6 +65,12 @@ class pyfuncfuture:
     def result(self): return self.pheader, self.cheader, self.ec, self.out
     pass
 
+def HOME():
+    if os.name != "nt": return os.environ["HOME"]
+    homedrive = os.environ["HOMEDRIVE"]
+    homepath = os.environ["HOMEPATH"]
+    return "{homedrive}/{homepath}".format(homedrive=homedrive, homepath=homepath)
+
 def main():
     signal.signal(signalnum = signal.SIGINT, handler = signal.SIG_DFL)
     if os.name == "nt": os.system("color")
@@ -72,7 +78,7 @@ def main():
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
     parser.add_argument("--command", help="prefix {cmd}", action="store_true", default=False)
     parser.add_argument("--config", help="config option", action="append")
-    parser.add_argument("--configfile", help="config file", type=str, default=f'{os.environ["HOME"]}/.onsub.py')
+    parser.add_argument("--configfile", help="config file", type=str, default=f'{HOME()}/.onsub.py')
     parser.add_argument("--count", help="count for substitutions", type=int, default=10)
     parser.add_argument("--debug", help="debug flag", action="store_true")
     parser.add_argument("--depth", help="walk depth", type=int, default=-1)
@@ -84,9 +90,11 @@ def main():
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=False)
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
     parser.add_argument("--noop", help="no command execution", action="store_true")
+    parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str, default="%]")
     parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str, default="py:enable")
     parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str, default="py:makecommand")
     parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str, default="py:makefunction")
+    parser.add_argument("--py:openbrace", dest="pyopenbrace", help="key for py:openbrace", type=str, default="%[")
     parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str, default="py:priority")
     parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
     parser.add_argument("--verbose", help="verbose level", type=int, default=4)
@@ -119,9 +127,11 @@ def main():
     suppress = args.suppress
     verbose = args.verbose
     workers = args.workers
+    pyclosebrace = args.pyclosebrace
     pyenable = args.pyenable
     pymakefunction = args.pymakefunction
     pymakecommand = args.pymakecommand
+    pyopenbrace = args.pyopenbrace
     pypriority = args.pypriority
 
     paths = {}
@@ -253,7 +263,7 @@ def main():
             future = pyfuncfuture(pheader, cheader, ec, out)
             pass
         else:
-            cmd = format(" ".join(command + args.rest), default, count)
+            cmd = format(" ".join(command + args.rest), default, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, path])
             pass
         futures.append(future)
