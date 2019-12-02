@@ -36,10 +36,11 @@ def mysystem(cmd):
         pass
     return ec, out
 
-def work(path, cmd, section, verbose, debug):
+def work(path, cmd, section, verbose, debug, noexec):
     pheader = "{path} ({section})".format(path=path, section=section)
     cheader = "{cmd}".format(cmd=cmd)
     if verbose >= 4: print(pheader, cheader)
+    if noexec: return pheader, cheader, 0, "[noexec] {cmd}".format(cmd=cmd)
     ec, out = mysystem(cmd)
     if debug:
         print(pheader, cheader, "=", ec)
@@ -47,8 +48,8 @@ def work(path, cmd, section, verbose, debug):
         pass
     return pheader, cheader, ec, out
 
-def cdwork(path, cmd, section, verbose, debug, cd):
-    with pd.pushd(cd): rv = work(path, cmd, section, verbose, debug)
+def cdwork(path, cmd, section, verbose, debug, noexec, cd):
+    with pd.pushd(cd): rv = work(path, cmd, section, verbose, debug, noexec)
     return rv
 
 def color(nocolor, colors, color):
@@ -76,6 +77,7 @@ def main():
     if os.name == "nt": os.system("color")
     fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=36, width=120)
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
+    parser.add_argument("--chdir", help="chdir first", type=str)
     parser.add_argument("--command", help="prefix {cmd}", action="store_true", default=False)
     parser.add_argument("--config", help="config option", action="append")
     parser.add_argument("--configfile", help="config file", type=str, default=f'{HOME()}/.onsub.py')
@@ -89,6 +91,7 @@ def main():
     parser.add_argument("--file", help="file with folder names", action="append")
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=False)
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
+    parser.add_argument("--noexec", help="do not actually execute", action="store_true", default=False)
     parser.add_argument("--noop", help="no command execution", action="store_true")
     parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str, default="%]")
     parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str, default="py:enable")
@@ -124,6 +127,7 @@ def main():
     files = []
     if args.file: files = args.file
     nocolor = args.nocolor
+    noexec = args.noexec
     suppress = args.suppress
     verbose = args.verbose
     workers = args.workers
@@ -133,6 +137,7 @@ def main():
     pymakecommand = args.pymakecommand
     pyopenbrace = args.pyopenbrace
     pypriority = args.pypriority
+    if args.chdir: os.chdir(args.chdir)
 
     paths = {}
     for file in files:
@@ -227,10 +232,10 @@ def main():
                     pass
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
-                    future = pool.schedule(work, args=[path, cmd, section, verbose, debug])
+                    future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
                     pass
                 else:
-                    ec, out = makefunction(verbose, debug, path, *entry)
+                    ec, out = makefunction(verbose, debug, path, noexec, *entry)
                     future = pyfuncfuture(path, makefunction.__name__, ec, out)
                     pass
                 if noop:
@@ -259,12 +264,12 @@ def main():
             cheader = "{cmd}".format(cmd=cmd)
             try: pyfunc = default[cmd]
             except KeyError: error(256 - 7, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
-            with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, *rem)
+            with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
             pass
         else:
             cmd = format(" ".join(command + args.rest), default, pyopenbrace, pyclosebrace, count)
-            future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, path])
+            future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, noexec, path])
             pass
         futures.append(future)
         continue

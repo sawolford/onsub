@@ -7,10 +7,11 @@ colors = {
 #     "partition": "yellow",
 }
 
-def fileCheck(verbose, debug, path, *args):
+def fileCheck(verbose, debug, path, noexec, *args):
     if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
     fname = args[0]
     if verbose >= 4: print("os.path.exists({fname})".format(fname=fname))
+    if noexec: return 0, "[noexec] py:fileCheck"
     exists = os.path.exists(fname)
     fpath = "{path}/{fname}".format(path=path, fname=fname)
     if exists: return 0, "{fpath} exists".format(fpath=fpath)
@@ -18,13 +19,13 @@ def fileCheck(verbose, debug, path, *args):
 
 defdefault = {
     "py:fileCheck": fileCheck,
+    "cwd": f"{os.getcwd()}",
 }
 
 deflinux = {
     "echo": "/bin/echo",
     "lswcl": "ls | wc -l",
 }
-if os.name != "nt": deflinux["cwd"] = f'{sp.check_output("pwd").strip().decode()}'
 
 defwindows = {}
 
@@ -120,8 +121,9 @@ if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
 svn["py:enable"] = True
 
-def everymakefunction(verbose, debug, path, *rest):
+def everymakefunction(verbose, debug, path, noexec, *rest):
     if verbose >=4: print("os.makedirs({path})".format(path=path))
+    if noexec: return 0, "[noexec] os.makedirs({path})".format(path=path)
     os.makedirs(path)
     return 0, "os.makedirs({path})".format(path=path)
 

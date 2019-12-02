@@ -136,13 +136,13 @@ Explanation:
 	
 	defdefault = {
 		"py:fileCheck": fileCheck,
+		"cwd": f"{os.getcwd()}",
 	}
 	
 	deflinux = {
 		"echo": "/bin/echo",
     	"lswcl": "ls | wc -l",
 	}
-	if os.name != "nt": deflinux["cwd"] = f'{sp.check_output("pwd").strip().decode()}'
 	
 	defwindows = {}
 	
@@ -397,11 +397,11 @@ Explanation:
 ## Command line options
 The basic command line options, with variable outputs specified by <>, are:
 
-	usage: onsub [-h] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
-				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
-				 [--noop] [--py:closebrace PYCLOSEBRACE] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND]
-				 [--py:makefunction PYMAKEFUNCTION] [--py:openbrace PYOPENBRACE] [--py:priority PYPRIORITY] [--suppress]
-				 [--verbose VERBOSE] [--workers WORKERS]
+	usage: onsub [-h] [--chdir CHDIR] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug]
+				 [--depth DEPTH] [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor]
+				 [--noenable] [--noexec] [--noop] [--py:closebrace PYCLOSEBRACE] [--py:enable PYENABLE]
+				 [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION] [--py:openbrace PYOPENBRACE]
+				 [--py:priority PYPRIORITY] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
 				 ...
 	
 	walks filesystem executing arbitrary commands
@@ -411,6 +411,7 @@ The basic command line options, with variable outputs specified by <>, are:
 	
 	optional arguments:
 	  -h, --help                        show this help message and exit
+	  --chdir CHDIR                     chdir first (default: None)
 	  --command                         prefix {cmd} (default: False)
 	  --config CONFIG                   config option (default: None)
 	  --configfile CONFIGFILE           config file (default: /Users/swolford/.onsub.py)
@@ -424,6 +425,7 @@ The basic command line options, with variable outputs specified by <>, are:
 	  --file FILE                       file with folder names (default: None)
 	  --nocolor                         disables colorized output (default: False)
 	  --noenable                        no longer enable any sections (default: False)
+	  --noexec                          do not actually execute (default: False)
 	  --noop                            no command execution (default: False)
 	  --py:closebrace PYCLOSEBRACE      key for py:closebrace (default: %])
 	  --py:enable PYENABLE              key for py:enable (default: py:enable)
@@ -441,6 +443,13 @@ Default: \<none><br>
 Option: \<none><br>
 Repeat: No<br><br>
 Outputs command line options (see above).
+### --chdir CHDIR
+	--chdir CHDIR                     chdir first (default: None)
+Type: Option<br>
+Default: \<none><br>
+Option `CHDIR`<br>
+Repeat: No<br><br>
+Changes directory before execution.
 ### --command
 	--command                         prefix {cmd} (default: False)
 Type: Flag<br>
@@ -532,6 +541,13 @@ Default: False<br>
 Option: \<none><br>
 Repeat: No<br><br>
 Defaults all configuration sections to not be enabled. This can be change later for each configuration section with other command line options.
+### --noexec
+	--noexec                          do not actually execute (default: False)
+Type: Flag<br>
+Default: False<br>
+Option: \<none>
+Repeat: No<br><br>
+Causes commands to be printed to the console but not actually executed.
 ### --noop
 	--noop                            no command execution (default: False)
 Type: Flag<br>
@@ -620,16 +636,6 @@ Examples of using onsub are below. The configuration file is assumed to be [exam
 	svn/.svn
 Due to the limited quoting ability of the Windows `CMD.EXE` command shell, some of these examples are too sophisticated to run correctly in that environment.
 ### Dump config (--dump DUMP [--dump DUMP ...])
-With no arguments:
-
-	usage: onsub [-h] [--command] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
-				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--nocolor] [--noenable]
-				 [--noop] [--py:closebrace PYCLOSEBRACE] [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND]
-				 [--py:makefunction PYMAKEFUNCTION] [--py:openbrace PYOPENBRACE] [--py:priority PYPRIORITY] [--suppress]
-				 [--verbose VERBOSE] [--workers WORKERS]
-				 ...
-	onsub: error: argument --dump: expected one argument
-
 With `--dump default`:
 
 	$ onsub --dump default
