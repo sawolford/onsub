@@ -25,9 +25,14 @@ def format(st, rc, openbrace, closebrace, count):
         continue
     return st.replace(openbrace, "{").replace(closebrace, "}")
 
-def mysystem(cmd):
+def mycheck_call(cmd):
+    try: ec = sp.check_call(cmd, shell=True)
+    except sp.CalledProcessError as exc: ec = exc.returncode
+    return ec, "{cmd}".format(cmd=cmd)
+
+def mycheck_output(cmd, stderr=sp.STDOUT):
     try:
-        out = sp.check_output(cmd, shell=True, stderr=sp.STDOUT).strip().decode()
+        out = sp.check_output(cmd, shell=True, stderr=stderr).decode()
         ec = 0
         pass
     except sp.CalledProcessError as exc:
@@ -41,7 +46,7 @@ def work(path, cmd, section, verbose, debug, noexec):
     cheader = "{cmd}".format(cmd=cmd)
     if verbose >= 4: print(pheader, cheader)
     if noexec: return pheader, cheader, 0, "[noexec] {cmd}".format(cmd=cmd)
-    ec, out = mysystem(cmd)
+    ec, out = mycheck_output(cmd)
     if debug:
         print(pheader, cheader, "=", ec)
         print(out)

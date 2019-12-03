@@ -45,7 +45,9 @@ gitdefault = {
     "py:priority": lambda verbose, debug, path: 4 if os.path.exists(".git") else 0,
     "py:makecommand": gitmakecommand,
     "cmd": "git",
+    "write": "{cmd} ci -a",
     "get": "{cmd} pull",
+    "put": "{cmd} push",
     "remotes": "{cmd} remote -v",
     "allremotes": "{remotes}",
 }
@@ -69,11 +71,19 @@ def hgmakecommand(verbose, debug, path, *rest):
     if debug: print(cmd)
     return cmd
 
+def hgwrite(verbose, debug, path, noexec, *rest):
+    cmd = " ".join(["hg ci"] + list(rest))
+    if noexec: return 0, "[noexec] {cmd}".format(cmd=cmd)
+    return mycheck_call(cmd)
+
 hgdefault =  {
     "py:priority": lambda verbose, debug, path: 3 if os.path.exists(".hg") else 0,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
+    "py:write": hgwrite,
+    "write": "{cmd} ci",
     "get": "{cmd} pull --update",
+    "put": "{cmd} push",
 }
 
 hglinux = {
@@ -106,7 +116,9 @@ svndefault = {
     "py:priority": lambda verbose, debug, path: 2 if os.path.exists(".svn") else 0,
     "py:makecommand": svnmakecommand,
     "cmd": "svn",
+    "write": "{cmd} [noop]",
     "get": "{cmd} up",
+    "put": "{cmd} ci",
     "remotes": "{cmd} info --show-item url",
     "allremotes": "{remotes}",
 }
