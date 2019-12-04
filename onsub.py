@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, signal, sys
+import os, signal, sys, time
 import argparse as ap
 import subprocess as sp
 import multiprocessing as mp
@@ -133,6 +133,8 @@ def main():
     parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str, default="py:makefunction")
     parser.add_argument("--py:openbrace", dest="pyopenbrace", help="key for py:openbrace", type=str, default="%[")
     parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str, default="py:priority")
+    parser.add_argument("--makesleep", help="sleep between calls", type=float, default=.1)
+    parser.add_argument("--commandsleep", help="sleep between calls", type=float, default=0)
     parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
     parser.add_argument("--verbose", help="verbose level", type=int, default=4)
     parser.add_argument("--workers", help="number of workers", type=int, default=mp.cpu_count())
@@ -162,6 +164,8 @@ def main():
     if args.file: files = args.file
     nocolor = args.nocolor
     noexec = args.noexec
+    makesleep = args.makesleep
+    commandsleep = args.commandsleep
     suppress = args.suppress
     verbose = args.verbose
     workers = args.workers
@@ -260,6 +264,7 @@ def main():
                     try: makefunction = default[pymakefunction]
                     except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                     pass
+                time.sleep(makesleep)
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
                     future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
@@ -287,6 +292,7 @@ def main():
         possible = maxpriority[1]
         with pd.pushd(path): rc = readconfig(configfile, configs)
         default = rc[possible]
+        time.sleep(commandsleep)
         if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
             cmd = rest[0]
             rem = rest[1:]
