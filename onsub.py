@@ -85,9 +85,20 @@ def readconfig(configfile, configs):
         continue
     return rc
 
+def display(verbose, nocolor, colors, pheader, cheader, ec, out):
+    if verbose >= 3:
+        tc.cprint(pheader, color(nocolor, colors, "path"), end="")
+        tc.cprint(" ", end="")
+        tc.cprint(cheader, color(nocolor, colors, "command"))
+        pass
+    if verbose >= 2:
+        if ec: tc.cprint(out, color(nocolor, colors, "bad"))
+        else: tc.cprint(out, color(nocolor, colors, "good"))
+        pass
+    return
 
 def main():
-    signal.signal(signalnum = signal.SIGINT, handler = signal.SIG_DFL)
+    signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_DFL)
     if os.name == "nt": os.system("color")
     fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=36, width=120)
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
@@ -165,7 +176,7 @@ def main():
                 continue
             continue
         continue
-
+    
     def pathIterate():
         for root, dirs, files in os.walk(".", followlinks=True): yield root, None, None
         return
@@ -254,7 +265,7 @@ def main():
                 future.result()
                 pass
             pass
-
+        
         maxpriority = (0, "")
         for possible, priority in priorities.items():
             if section and section != possible: continue
@@ -283,27 +294,31 @@ def main():
             pass
         futures.append(future)
         continue
-        
+    
     results = []
-    for future in futures:
-        pheader, cheader, ec, out = future.result()
-        results.append((pheader, cheader, ec, out))
+    while True:
+        nfutures = []
+        for future in futures:
+            if future.done():
+                pheader, cheader, ec, out = future.result()
+                if verbose >= 5:
+                    display(verbose, nocolor, colors, pheader, cheader, ec, out)
+                    pass
+                results.append((pheader, cheader, ec, out))
+                pass
+            else: nfutures.append(future)
+            continue
+        if len(nfutures) == 0: break
+        futures = nfutures
         continue
-
+    
     nerrors = 0
+    tc.cprint("<<< RESULTS >>>", color(nocolor, colors, "partition"))
     for pheader, cheader, ec, out in results:
         if ec: nerrors += 1
-        if verbose >= 3:
-            tc.cprint(pheader, color(nocolor, colors, "path"), end="")
-            tc.cprint(" ", end="")
-            tc.cprint(cheader, color(nocolor, colors, "command"))
-            pass
-        if verbose >= 2:
-            if ec: tc.cprint(out, color(nocolor, colors, "bad"))
-            else: tc.cprint(out, color(nocolor, colors, "good"))
-            pass
+        display(verbose, nocolor, colors, pheader, cheader, ec, out)
         continue
-
+    
     if not suppress and verbose >= 1 and nerrors > 0:
         tc.cprint("<<< ERRORS >>>", color(nocolor, colors, "partition"))
         for pheader, cheader, ec, out in results:
