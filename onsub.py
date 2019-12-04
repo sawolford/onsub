@@ -79,7 +79,7 @@ def HOME():
     homepath = os.environ["HOMEPATH"]
     return "{homedrive}/{homepath}".format(homedrive=homedrive, homepath=homepath)
 
-def readconfig(configfile, configs):
+def readConfig(configfile, configs):
     rc = rp.run_path(configfile, globals())
     for config in configs:
         exec(config, globals(), rc)
@@ -98,6 +98,44 @@ def display(verbose, nocolor, colors, pheader, cheader, ec, out):
         pass
     return
 
+def genParser():
+    fc = lambda prog: ap.RawDescriptionHelpFormatter(prog, max_help_position=36, width=120)
+    parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
+    parser.add_argument("--chdir", help="chdir first", type=str)
+    parser.add_argument("--command", help="prefix {cmd}", action="store_true")
+    parser.add_argument("--config", help="config option", action="append")
+    parser.add_argument("--configfile", help="config file", type=str)
+    parser.add_argument("--count", help="count for substitutions", type=int)
+    parser.add_argument("--debug", help="debug flag", action="store_true")
+    parser.add_argument("--depth", help="walk depth", type=int)
+    parser.add_argument("--disable", help="disable section", action="append")
+    parser.add_argument("--dump", help="dump section", action="append")
+    parser.add_argument("--dumpall", help="dump all sections", action="store_true")
+    parser.add_argument("--enable", help="enable section", action="append")
+    parser.add_argument("--file", help="file with folder names", action="append")
+    parser.add_argument("--nocolor", help="disables colorized output", action="store_true")
+    parser.add_argument("--noenable", help="no longer enable any sections", action="store_true")
+    parser.add_argument("--noexec", help="do not actually execute", action="store_true")
+    parser.add_argument("--noop", help="no command execution", action="store_true")
+    parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str)
+    parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str)
+    parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str)
+    parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str)
+    parser.add_argument("--py:openbrace", dest="pyopenbrace", help="key for py:openbrace", type=str)
+    parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str)
+    parser.add_argument("--sleepmake", help="sleep between calls", type=float)
+    parser.add_argument("--sleepcommand", help="sleep between calls", type=float)
+    parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
+    parser.add_argument("--verbose", help="verbose level", type=int)
+    parser.add_argument("--workers", help="number of workers", type=int)
+    parser.add_argument("rest", nargs=ap.REMAINDER)
+    return parser
+
+def getValue(cmdarg, filearg, default):
+    if cmdarg: return cmdarg
+    if filearg: return filearg
+    return default
+
 futures = []
 def sighandler(signum, frame):
     global futures
@@ -109,78 +147,47 @@ def main():
     global futures
     signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_IGN)
     if os.name == "nt": os.system("color")
-    fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=36, width=120)
-    parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
-    parser.add_argument("--chdir", help="chdir first", type=str)
-    parser.add_argument("--command", help="prefix {cmd}", action="store_true", default=False)
-    parser.add_argument("--config", help="config option", action="append")
-    parser.add_argument("--configfile", help="config file", type=str, default=f'{HOME()}/.onsub.py')
-    parser.add_argument("--count", help="count for substitutions", type=int, default=10)
-    parser.add_argument("--debug", help="debug flag", action="store_true")
-    parser.add_argument("--depth", help="walk depth", type=int, default=-1)
-    parser.add_argument("--disable", help="disable section", action="append")
-    parser.add_argument("--dump", help="dump section", action="append")
-    parser.add_argument("--dumpall", help="dump all sections", action="store_true", default=False)
-    parser.add_argument("--enable", help="enable section", action="append")
-    parser.add_argument("--file", help="file with folder names", action="append")
-    parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=False)
-    parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=False)
-    parser.add_argument("--noexec", help="do not actually execute", action="store_true", default=False)
-    parser.add_argument("--noop", help="no command execution", action="store_true")
-    parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str, default="%]")
-    parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str, default="py:enable")
-    parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str, default="py:makecommand")
-    parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str, default="py:makefunction")
-    parser.add_argument("--py:openbrace", dest="pyopenbrace", help="key for py:openbrace", type=str, default="%[")
-    parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str, default="py:priority")
-    parser.add_argument("--makesleep", help="sleep between calls", type=float, default=.1)
-    parser.add_argument("--commandsleep", help="sleep between calls", type=float, default=0)
-    parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
-    parser.add_argument("--verbose", help="verbose level", type=int, default=4)
-    parser.add_argument("--workers", help="number of workers", type=int, default=mp.cpu_count())
-    parser.add_argument("rest", nargs=ap.REMAINDER)
-    args = parser.parse_args()
-    command = []
-    if args.command: command = ["{cmd}"]
-    noop = False
-    if args.noop: noop = True
-    rest = args.rest
-    configfile = args.configfile
-    configs = []
-    if args.config: configs = args.config
-    count = args.count
-    debug = args.debug
-    noenable = args.noenable
-    depth = args.depth
-    dumps = []
-    if args.dump: dumps = args.dump
-    dumpall = args.dumpall
-    if not noop and not dumpall and len(dumps) == 0 and len(args.rest) < 1: error(256 - 1, "Not enough command arguments")
-    disables = []
-    if args.disable: disables = args.disable
-    enables = []
-    if args.enable: enables = args.enable
-    files = []
-    if args.file: files = args.file
-    nocolor = args.nocolor
-    noexec = args.noexec
-    makesleep = args.makesleep
-    commandsleep = args.commandsleep
-    suppress = args.suppress
-    verbose = args.verbose
-    workers = args.workers
-    pyclosebrace = args.pyclosebrace
-    pyenable = args.pyenable
-    pymakefunction = args.pymakefunction
-    pymakecommand = args.pymakecommand
-    pyopenbrace = args.pyopenbrace
-    pypriority = args.pypriority
-    if args.chdir: os.chdir(args.chdir)
+    parser = genParser()
+    cmdargs = parser.parse_args()
+    configfile = getValue(cmdargs.configfile, None, f'{HOME()}/.onsub.py')
+    rc = readConfig(configfile, [])
+    rcarguments = rc["arguments"] if "arguments" in rc else []
+    fileargs = parser.parse_args(rcarguments)
+    chdir = getValue(cmdargs.chdir, None, None)
+    command = ["{cmd}"] if getValue(cmdargs.command, fileargs.command, False) else [""]
+    configs = getValue(cmdargs.config, None, [])
+    count = getValue(cmdargs.count, fileargs.count, 10)
+    debug = getValue(cmdargs.debug, fileargs.debug, False)
+    depth = getValue(cmdargs.depth, None, -1)
+    disables = (cmdargs.disable or []) + (fileargs.disable or [])
+    dumps = cmdargs.dump or []
+    dumpall = getValue(cmdargs.dumpall, None, False)
+    enables = (cmdargs.enable or []) + (fileargs.enable or [])
+    files = (cmdargs.file or []) + (fileargs.file or [])
+    nocolor = getValue(cmdargs.nocolor, fileargs.nocolor, False)
+    noenable = getValue(cmdargs.noenable, fileargs.noenable, False)
+    noexec = getValue(cmdargs.noexec, fileargs.noexec, False)
+    noop = getValue(cmdargs.noop, fileargs.noop, False)
+    pyclosebrace = getValue(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
+    pyenable = getValue(cmdargs.pyenable, fileargs.pyenable, "py:enable")
+    pymakecommand = getValue(cmdargs.pymakecommand, fileargs.pymakecommand, "py:makecommand")
+    pymakefunction = getValue(cmdargs.pymakefunction, fileargs.pymakefunction, "py:makefunction")
+    pyopenbrace = getValue(cmdargs.pyopenbrace, fileargs.pyopenbrace, "%[")
+    pypriority = getValue(cmdargs.pypriority, fileargs.pypriority, "py:priority")
+    sleepmake = getValue(cmdargs.sleepmake, fileargs.sleepmake, 0.1)
+    sleepcommand = getValue(cmdargs.sleepcommand, fileargs.sleepcommand, 0)
+    suppress = getValue(cmdargs.suppress, fileargs.suppress, False)
+    verbose = getValue(cmdargs.verbose, fileargs.verbose, 4)
+    workers = getValue(cmdargs.workers, fileargs.workers, mp.cpu_count())
+    rest = cmdargs.rest
+
+    if not noop and not dumpall and len(dumps) == 0 and len(rest) < 1: error(256 - 1, "Not enough command arguments")
+    if chdir: os.chdir(chdir)
 
     paths = {}
     for file in files:
         if not os.path.exists(file): error(256 - 2, 'Input file {file} does not exist'.format(file=file))
-        rc = readconfig(file, configs)
+        rc = readConfig(file, configs)
         for section in rc:
             rcsection = rc[section]
             if type(rcsection) != type([]): continue
@@ -205,8 +212,7 @@ def main():
         pass
     
     if not os.path.exists(configfile): error(256 - 3, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
-    rcstring = open(configfile).read()
-    rc = readconfig(configfile, configs)
+    rc = readConfig(configfile, configs)
     priorities = {}
     dumpFound = False
     for section, vv in rc.items():
@@ -256,7 +262,7 @@ def main():
         if depth >= 0 and nsep >= depth: continue
         if not os.path.exists(path):
             if section in priorities:
-                rc = readconfig(configfile, configs)
+                rc = readConfig(configfile, configs)
                 default = rc[section]
                 makefunction = makecommand = None
                 try: makecommand = default[pymakecommand]
@@ -264,7 +270,7 @@ def main():
                     try: makefunction = default[pymakefunction]
                     except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                     pass
-                time.sleep(makesleep)
+                time.sleep(sleepmake)
                 if makecommand:
                     cmd = makecommand(verbose, debug, path, *entry)
                     future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
@@ -290,9 +296,9 @@ def main():
             continue
         if maxpriority[0] == 0: continue
         possible = maxpriority[1]
-        with pd.pushd(path): rc = readconfig(configfile, configs)
+        with pd.pushd(path): rc = readConfig(configfile, configs)
         default = rc[possible]
-        time.sleep(commandsleep)
+        time.sleep(sleepcommand)
         if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
             cmd = rest[0]
             rem = rest[1:]
@@ -304,7 +310,7 @@ def main():
             future = pyfuncfuture(pheader, cheader, ec, out)
             pass
         else:
-            cmd = format(" ".join(command + args.rest), default, pyopenbrace, pyclosebrace, count)
+            cmd = format(" ".join(command + rest), default, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, noexec, path])
             pass
         futures.append(future)
@@ -328,11 +334,13 @@ def main():
         continue
     
     nerrors = 0
-    tc.cprint("<<< RESULTS >>>", color(nocolor, colors, "partition"))
-    for pheader, cheader, ec, out in results:
-        if ec: nerrors += 1
-        display(verbose, nocolor, colors, pheader, cheader, ec, out)
-        continue
+    if len(results):
+        tc.cprint("<<< RESULTS >>>", color(nocolor, colors, "partition"))
+        for pheader, cheader, ec, out in results:
+            if ec: nerrors += 1
+            display(verbose, nocolor, colors, pheader, cheader, ec, out)
+            continue
+        pass
     
     if not suppress and verbose >= 1 and nerrors > 0:
         tc.cprint("<<< ERRORS >>>", color(nocolor, colors, "partition"))

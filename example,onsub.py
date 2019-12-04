@@ -1,3 +1,26 @@
+arguments = [
+    # "--command",
+    # "--count", "10",
+    # "--debug",
+    # "--disable", "every",
+    # "--enable", "every",
+    # "--nocolor",
+    # "--noenable",
+    # "--noexec",
+    # "--noop",
+    # "--py:closebrace", "%]",
+    # "--py:enable", "py:enable",
+    # "--py:makecommand", "py:makecommand",
+    # "--py:makefunction", "py:makefunction",
+    # "--py:openbrace", "%[",
+    # "--py:priority", "py:priority",
+    # "--sleepmake", ".1",
+    # "--sleepcommand", "0",
+    # "--suppress",
+    # "--verbose", "5",
+    # "--workers", "8",
+]
+
 colors = {
 #     "path": "blue",
 #     "command": "cyan",
