@@ -69,6 +69,7 @@ class pyfuncfuture:
         self.ec = ec
         self.out = out
         return
+    def done(self): return True
     def result(self): return self.pheader, self.cheader, self.ec, self.out
     pass
 
@@ -97,8 +98,16 @@ def display(verbose, nocolor, colors, pheader, cheader, ec, out):
         pass
     return
 
+futures = []
+def sighandler(signum, frame):
+    global futures
+    for future in futures: future.cancel()
+    sys.exit()
+    return
+
 def main():
-    signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_DFL)
+    global futures
+    signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_IGN)
     if os.name == "nt": os.system("color")
     fc = lambda prog: ap.ArgumentDefaultsHelpFormatter(prog, max_help_position=36, width=120)
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
@@ -234,9 +243,9 @@ def main():
     except KeyError: pass
 
     pool = pb.ProcessPool(max_workers=workers)
+    signal.signal(signal.SIGINT, sighandler)
     root = os.getcwd()
     errors = []
-    futures = []
     for path, section, entry in pathIterate():
         if not entry: entry = tuple()
         nsep = path.count(os.path.sep)
