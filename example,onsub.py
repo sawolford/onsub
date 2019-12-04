@@ -23,11 +23,14 @@ defdefault = {
 }
 
 deflinux = {
+    "sep": ";",
     "echo": "/bin/echo",
     "lswcl": "ls | wc -l",
 }
 
-defwindows = {}
+defwindows = {
+    "sep": "&",
+}
 
 default = {}
 default.update(defdefault)

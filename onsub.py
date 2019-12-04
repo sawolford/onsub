@@ -4,8 +4,9 @@ import argparse as ap
 import subprocess as sp
 import multiprocessing as mp
 import termcolor as tc
-import pushd as pd
 import pebble as pb
+import runpy as rp
+import pushd as pd
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -77,6 +78,14 @@ def HOME():
     homepath = os.environ["HOMEPATH"]
     return "{homedrive}/{homepath}".format(homedrive=homedrive, homepath=homepath)
 
+def readconfig(configfile, configs):
+    rc = rp.run_path(configfile, globals())
+    for config in configs:
+        exec(config, globals(), rc)
+        continue
+    return rc
+
+
 def main():
     signal.signal(signalnum = signal.SIGINT, handler = signal.SIG_DFL)
     if os.name == "nt": os.system("color")
@@ -147,10 +156,11 @@ def main():
     paths = {}
     for file in files:
         if not os.path.exists(file): error(256 - 2, 'Input file {file} does not exist'.format(file=file))
-        rc = {}
-        exec(open(file).read(), globals(), rc)
+        rc = readconfig(file, configs)
         for section in rc:
-            for path in rc[section]:
+            rcsection = rc[section]
+            if type(rcsection) != type([]): continue
+            for path in rcsection:
                 paths.setdefault(section, []).append(path)
                 continue
             continue
@@ -172,11 +182,7 @@ def main():
     
     if not os.path.exists(configfile): error(256 - 3, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
     rcstring = open(configfile).read()
-    rc = {}
-    exec(rcstring, globals(), rc)
-    for config in configs:
-        exec(config, globals(), rc)
-        continue
+    rc = readconfig(configfile, configs)
     priorities = {}
     dumpFound = False
     for section, vv in rc.items():
@@ -222,12 +228,11 @@ def main():
     futures = []
     for path, section, entry in pathIterate():
         if not entry: entry = tuple()
-        rc = {}
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         if not os.path.exists(path):
             if section in priorities:
-                exec(rcstring, globals(), rc)
+                rc = readconfig(configfile, configs)
                 default = rc[section]
                 makefunction = makecommand = None
                 try: makecommand = default[pymakecommand]
@@ -260,7 +265,7 @@ def main():
             continue
         if maxpriority[0] == 0: continue
         possible = maxpriority[1]
-        with pd.pushd(path): exec(rcstring, globals(), rc)
+        with pd.pushd(path): rc = readconfig(configfile, configs)
         default = rc[possible]
         if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
             cmd = rest[0]
