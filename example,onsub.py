@@ -4,9 +4,13 @@ arguments = [
     # "--debug",
     # "--disable", "every",
     # "--enable", "every",
+    # "--file", "subs.py",
+    # "--ignore", ".hg", "--ignore", ".git", "--ignore", ".svn",
     # "--nocolor",
     # "--noenable",
     # "--noexec",
+    # "--nofile",
+    # "--noignore",
     # "--noop",
     # "--py:closebrace", "%]",
     # "--py:enable", "py:enable",
@@ -67,8 +71,10 @@ def gitmakecommand(verbose, debug, path, *rest):
     if debug: print(cmd)
     return cmd
 
+def gittest(verbose, debug, path): return 4 if os.path.exists(".git") else 0
+
 gitdefault = {
-    "py:priority": lambda verbose, debug, path: 4 if os.path.exists(".git") else 0,
+    "py:priority": gittest, 
     "py:makecommand": gitmakecommand,
     "cmd": "git",
     "write": "{cmd} ci -a",
@@ -102,8 +108,10 @@ def hgwrite(verbose, debug, path, noexec, *rest):
     if noexec: return 0, "[noexec] {cmd}".format(cmd=cmd)
     return mycheck_call(cmd)
 
+def hgtest(verbose, debug, path): return 3 if os.path.exists(".hg") else 0
+
 hgdefault =  {
-    "py:priority": lambda verbose, debug, path: 3 if os.path.exists(".hg") else 0,
+    "py:priority": hgtest,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
     "py:write": hgwrite,
@@ -138,8 +146,10 @@ def svnmakecommand(verbose, debug, path, *rest):
     if debug: print(cmd)
     return cmd
 
+def svntest(verbose, debug, path): return 2 if os.path.exists(".svn") else 0
+
 svndefault = {
-    "py:priority": lambda verbose, debug, path: 2 if os.path.exists(".svn") else 0,
+    "py:priority": svntest,
     "py:makecommand": svnmakecommand,
     "cmd": "svn",
     "write": "{cmd} [noop]",
@@ -165,8 +175,10 @@ def everymakefunction(verbose, debug, path, noexec, *rest):
     os.makedirs(path)
     return 0, "os.makedirs({path})".format(path=path)
 
+def everytest(verbose, debug, path): return 1
+
 everydefault = {
-    "py:priority": lambda verbose, debug, path: 1,
+    "py:priority": everytest,
     "py:makefunction": everymakefunction,
 }
 

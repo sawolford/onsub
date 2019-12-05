@@ -70,6 +70,7 @@ class pyfuncfuture:
         self.out = out
         return
     def done(self): return True
+    def cancel(self): return
     def result(self): return self.pheader, self.cheader, self.ec, self.out
     pass
 
@@ -113,9 +114,12 @@ def genParser():
     parser.add_argument("--dumpall", help="dump all sections", action="store_true")
     parser.add_argument("--enable", help="enable section", action="append")
     parser.add_argument("--file", help="file with folder names", action="append")
+    parser.add_argument("--ignore", help="ignore folder names", action="append")
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true")
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true")
     parser.add_argument("--noexec", help="do not actually execute", action="store_true")
+    parser.add_argument("--nofile", help="ignore file options", action="store_true")
+    parser.add_argument("--noignore", help="ignore ignore options", action="store_true")
     parser.add_argument("--noop", help="no command execution", action="store_true")
     parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str)
     parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str)
@@ -163,10 +167,13 @@ def main():
     dumps = cmdargs.dump or []
     dumpall = getValue(cmdargs.dumpall, None, False)
     enables = (cmdargs.enable or []) + (fileargs.enable or [])
-    files = (cmdargs.file or []) + (fileargs.file or [])
     nocolor = getValue(cmdargs.nocolor, fileargs.nocolor, False)
     noenable = getValue(cmdargs.noenable, fileargs.noenable, False)
     noexec = getValue(cmdargs.noexec, fileargs.noexec, False)
+    nofile = getValue(cmdargs.nofile, fileargs.nofile, False)
+    files = (cmdargs.file or []) + (fileargs.file or []) if not nofile else []
+    noignore = getValue(cmdargs.noignore, fileargs.noignore, False)
+    ignores = (cmdargs.ignore or []) + (fileargs.ignore or []) if not noignore else []
     noop = getValue(cmdargs.noop, fileargs.noop, False)
     pyclosebrace = getValue(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
     pyenable = getValue(cmdargs.pyenable, fileargs.pyenable, "py:enable")
@@ -180,7 +187,6 @@ def main():
     verbose = getValue(cmdargs.verbose, fileargs.verbose, 4)
     workers = getValue(cmdargs.workers, fileargs.workers, mp.cpu_count())
     rest = cmdargs.rest
-
     if not noop and not dumpall and len(dumps) == 0 and len(rest) < 1: error(256 - 1, "Not enough command arguments")
     if chdir: os.chdir(chdir)
 
@@ -197,11 +203,14 @@ def main():
             continue
         continue
     
-    def pathIterate():
-        for root, dirs, files in os.walk(".", followlinks=True): yield root, None, None
+
+    def pathIterate(ignores):
+        for root, dirs, files in os.walk(".", followlinks=True, topdown=True):
+            dirs[:] = [d for d in dirs if d not in ignores]
+            yield root, None, None
         return
     if len(paths):
-        def pathIterate(paths=paths):
+        def pathIterate(ignores, paths=paths):
             for section in paths:
                 for entry in paths[section]:
                     if type(entry) == type(""): yield entry, section, None
@@ -256,7 +265,7 @@ def main():
     signal.signal(signal.SIGINT, sighandler)
     root = os.getcwd()
     errors = []
-    for path, section, entry in pathIterate():
+    for path, section, entry in pathIterate(ignores):
         if not entry: entry = tuple()
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
@@ -308,6 +317,7 @@ def main():
             except KeyError: error(256 - 7, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
             with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
+            if verbose >= 6: display(verbose, nocolor, colors, pheader, cheader, ec, out)
             pass
         else:
             cmd = format(" ".join(command + rest), default, pyopenbrace, pyclosebrace, count)
@@ -322,9 +332,7 @@ def main():
         for future in futures:
             if future.done():
                 pheader, cheader, ec, out = future.result()
-                if verbose >= 5:
-                    display(verbose, nocolor, colors, pheader, cheader, ec, out)
-                    pass
+                if verbose >= 5: display(verbose, nocolor, colors, pheader, cheader, ec, out)
                 results.append((pheader, cheader, ec, out))
                 pass
             else: nfutures.append(future)
