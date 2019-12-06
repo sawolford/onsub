@@ -147,6 +147,23 @@ def sighandler(signum, frame):
     sys.exit()
     return
 
+def waitFutures(verbose, futures):
+    results = []
+    while True:
+        nfutures = []
+        for future in futures:
+            if future.done():
+                pheader, cheader, ec, out = future.result()
+                if verbose >= 5: display(verbose, nocolor, colors, pheader, cheader, ec, out)
+                results.append((pheader, cheader, ec, out))
+                pass
+            else: nfutures.append(future)
+            continue
+        if len(nfutures) == 0: break
+        futures = nfutures
+        continue
+    return results
+
 def main():
     global futures
     signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_IGN)
@@ -209,16 +226,14 @@ def main():
             dirs[:] = [d for d in dirs if d not in ignores]
             yield root, None, None
         return
-    if len(paths):
-        def pathIterate(ignores, paths=paths):
-            for section in paths:
-                for entry in paths[section]:
-                    if type(entry) == type(""): yield entry, section, None
-                    else: yield entry[0], section, entry[1:]
-                    continue
+    def fileIterate(ignores, paths=paths):
+        for section in paths:
+            for entry in paths[section]:
+                if type(entry) == type(""): yield entry, section, None
+                else: yield entry[0], section, entry[1:]
                 continue
-            return
-        pass
+            continue
+        return
     
     if not os.path.exists(configfile): error(256 - 3, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
     rc = readConfig(configfile, configs)
@@ -263,12 +278,9 @@ def main():
 
     pool = pb.ProcessPool(max_workers=workers)
     signal.signal(signal.SIGINT, sighandler)
-    root = os.getcwd()
-    errors = []
-    for path, section, entry in pathIterate(ignores):
+
+    for path, section, entry in fileIterate(ignores):
         if not entry: entry = tuple()
-        nsep = path.count(os.path.sep)
-        if depth >= 0 and nsep >= depth: continue
         if not os.path.exists(path):
             if section in priorities:
                 rc = readConfig(configfile, configs)
@@ -288,59 +300,51 @@ def main():
                     ec, out = makefunction(verbose, debug, path, noexec, *entry)
                     future = pyfuncfuture(path, makefunction.__name__, ec, out)
                     pass
-                if noop:
-                    futures.append(future)
-                    continue
-                future.result()
+                futures.append(future)
                 pass
             pass
+        continue
+    waitFutures(verbose, futures)
+
+    root = os.getcwd()
+    errors = []
+    if len(files) > 0: iterate = fileIterate
+    else: iterate = pathIterate
+    for path, _, _ in iterate(ignores):
+        nsep = path.count(os.path.sep)
+        if depth >= 0 and nsep >= depth: continue
         
-        maxpriority = (0, "")
-        for possible, priority in priorities.items():
-            if section and section != possible: continue
+        maxsection = (0, "")
+        for section, priority in priorities.items():
             with pd.pushd(path): pvalue = priority(verbose, debug, path)
-            if pvalue > maxpriority[0]:
-                maxpriority = (pvalue, possible)
+            if pvalue > maxsection[0]:
+                maxsection = (pvalue, section)
                 pass
             continue
-        if maxpriority[0] == 0: continue
-        possible = maxpriority[1]
+        if maxsection[0] == 0: continue
+        section = maxsection[1]
         with pd.pushd(path): rc = readConfig(configfile, configs)
-        default = rc[possible]
+        default = rc[section]
         time.sleep(sleepcommand)
         if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
             cmd = rest[0]
             rem = rest[1:]
-            pheader = "{path} ({possible})".format(path=path, possible=possible)
+            pheader = "{path} ({section})".format(path=path, section=section)
             cheader = "{cmd}".format(cmd=cmd)
             try: pyfunc = default[cmd]
-            except KeyError: error(256 - 7, 'No "{cmd}" key in section {possible}'.format(cmd=cmd, possible=possible))
+            except KeyError: error(256 - 7, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
             with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
             if verbose >= 6: display(verbose, nocolor, colors, pheader, cheader, ec, out)
             pass
         else:
             cmd = format(" ".join(command + rest), default, pyopenbrace, pyclosebrace, count)
-            future = pool.schedule(cdwork, args=[path, cmd, possible, verbose, debug, noexec, path])
+            future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
             pass
         futures.append(future)
         continue
-    
-    results = []
-    while True:
-        nfutures = []
-        for future in futures:
-            if future.done():
-                pheader, cheader, ec, out = future.result()
-                if verbose >= 5: display(verbose, nocolor, colors, pheader, cheader, ec, out)
-                results.append((pheader, cheader, ec, out))
-                pass
-            else: nfutures.append(future)
-            continue
-        if len(nfutures) == 0: break
-        futures = nfutures
-        continue
-    
+    results = waitFutures(verbose, futures)
+
     nerrors = 0
     if len(results):
         tc.cprint("<<< RESULTS >>>", color(nocolor, colors, "partition"))

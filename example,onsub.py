@@ -80,8 +80,8 @@ gitdefault = {
     "write": "{cmd} ci -a",
     "get": "{cmd} pull",
     "put": "{cmd} push",
-    "remotes": "{cmd} remote -v",
-    "allremotes": "{remotes}",
+    "remote": "{cmd} remote -v",
+    "allremote": "{remotes}",
 }
 
 gitlinux = {}
@@ -121,8 +121,8 @@ hgdefault =  {
 }
 
 hglinux = {
-    "remotes": '{echo} -n "default = "; {cmd} paths default',
-    "allremotes": '{remotes}; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
+    "remote": '{echo} -n "default = "; {cmd} paths default',
+    "allremote": '{remotes}; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
 }
 
 hgwindows = {
@@ -155,8 +155,8 @@ svndefault = {
     "write": "{cmd} [noop]",
     "get": "{cmd} up",
     "put": "{cmd} ci",
-    "remotes": "{cmd} info --show-item url",
-    "allremotes": "{remotes}",
+    "remote": "{cmd} info --show-item url",
+    "allremote": "{remotes}",
 }
 
 svnlinux = {}
