@@ -1,5 +1,4 @@
 arguments = [
-    # "--command",
     # "--count", "10",
     # "--debug",
     # "--disable", "every",
@@ -81,7 +80,7 @@ gitdefault = {
     "get": "{cmd} pull",
     "put": "{cmd} push",
     "remote": "{cmd} remote -v",
-    "allremote": "{remotes}",
+    "allremote": "{remote}",
 }
 
 gitlinux = {}
@@ -122,12 +121,12 @@ hgdefault =  {
 
 hglinux = {
     "remote": '{echo} -n "default = "; {cmd} paths default',
-    "allremote": '{remotes}; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
+    "allremote": '{remote}; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
 }
 
 hgwindows = {
-    "remotes": '{cmd} paths default',
-    "allremotes": '{remotes}; {cmd} paths default-push; {cmd} paths default-pull',
+    "remote": '{cmd} paths default',
+    "allremote": '{remote}; {cmd} paths default-push; {cmd} paths default-pull',
 }
 
 hg = {}
@@ -156,7 +155,7 @@ svndefault = {
     "get": "{cmd} up",
     "put": "{cmd} ci",
     "remote": "{cmd} info --show-item url",
-    "allremote": "{remotes}",
+    "allremote": "{remote}",
 }
 
 svnlinux = {}

@@ -103,7 +103,6 @@ def genParser():
     fc = lambda prog: ap.RawDescriptionHelpFormatter(prog, max_help_position=36, width=120)
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
     parser.add_argument("--chdir", help="chdir first", type=str)
-    parser.add_argument("--command", help="prefix {cmd}", action="store_true")
     parser.add_argument("--config", help="config option", action="append")
     parser.add_argument("--configfile", help="config file", type=str)
     parser.add_argument("--count", help="count for substitutions", type=int)
@@ -147,7 +146,7 @@ def sighandler(signum, frame):
     sys.exit()
     return
 
-def waitFutures(verbose, futures):
+def waitFutures(verbose, nocolor, colors, futures):
     results = []
     while True:
         nfutures = []
@@ -175,7 +174,6 @@ def main():
     rcarguments = rc["arguments"] if "arguments" in rc else []
     fileargs = parser.parse_args(rcarguments)
     chdir = getValue(cmdargs.chdir, None, None)
-    command = ["{cmd}"] if getValue(cmdargs.command, fileargs.command, False) else [""]
     configs = getValue(cmdargs.config, None, [])
     count = getValue(cmdargs.count, fileargs.count, 10)
     debug = getValue(cmdargs.debug, fileargs.debug, False)
@@ -212,6 +210,7 @@ def main():
         if not os.path.exists(file): error(256 - 2, 'Input file {file} does not exist'.format(file=file))
         rc = readConfig(file, configs)
         for section in rc:
+            if section in ["python_path", "futures"]: continue
             rcsection = rc[section]
             if type(rcsection) != type([]): continue
             for path in rcsection:
@@ -282,35 +281,34 @@ def main():
     for path, section, entry in fileIterate(ignores):
         if not entry: entry = tuple()
         if not os.path.exists(path):
-            if section in priorities:
-                rc = readConfig(configfile, configs)
-                default = rc[section]
-                makefunction = makecommand = None
-                try: makecommand = default[pymakecommand]
-                except KeyError:
-                    try: makefunction = default[pymakefunction]
-                    except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
-                    pass
-                time.sleep(sleepmake)
-                if makecommand:
-                    cmd = makecommand(verbose, debug, path, *entry)
-                    future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
-                    pass
-                else:
-                    ec, out = makefunction(verbose, debug, path, noexec, *entry)
-                    future = pyfuncfuture(path, makefunction.__name__, ec, out)
-                    pass
-                futures.append(future)
+            if section not in priorities: error(256 - 6, "No section applies to {section} = {path}".format(section=section, path=path))
+            rc = readConfig(configfile, configs)
+            default = rc[section]
+            makefunction = makecommand = None
+            try: makecommand = default[pymakecommand]
+            except KeyError:
+                try: makefunction = default[pymakefunction]
+                except: error(256 - 7, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                 pass
+            time.sleep(sleepmake)
+            if makecommand:
+                cmd = makecommand(verbose, debug, path, *entry)
+                future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
+                pass
+            else:
+                ec, out = makefunction(verbose, debug, path, noexec, *entry)
+                future = pyfuncfuture(path, makefunction.__name__, ec, out)
+                pass
+            futures.append(future)
             pass
         continue
-    waitFutures(verbose, futures)
+    waitFutures(verbose, nocolor, colors, futures)
 
     root = os.getcwd()
     errors = []
-    if len(files) > 0: iterate = fileIterate
-    else: iterate = pathIterate
-    for path, _, _ in iterate(ignores):
+    if len(files) > 0: cmdIterate = fileIterate
+    else: cmdIterate = pathIterate
+    for path, _, _ in cmdIterate(ignores):
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         
@@ -332,18 +330,18 @@ def main():
             pheader = "{path} ({section})".format(path=path, section=section)
             cheader = "{cmd}".format(cmd=cmd)
             try: pyfunc = default[cmd]
-            except KeyError: error(256 - 7, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
+            except KeyError: error(256 - 8, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
             with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
             if verbose >= 6: display(verbose, nocolor, colors, pheader, cheader, ec, out)
             pass
         else:
-            cmd = format(" ".join(command + rest), default, pyopenbrace, pyclosebrace, count)
+            cmd = format(" ".join(rest), default, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, futures)
+    results = waitFutures(verbose, nocolor, colors, futures)
 
     nerrors = 0
     if len(results):
@@ -371,5 +369,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = main()
-    if rv >= 248: print("Errors exceed 248", file=sys.stderr)
+    if rv >= 247: print("Errors exceed 247", file=sys.stderr)
     sys.exit(rv)
