@@ -59,7 +59,7 @@ Python function taking four (4) arguments: `verbose`, `debug`, `path`, `*rest`. 
 #### - `py:makefunction` 
 Python function taking five (5) arguments: `verbose`, `debug`, `path`, `noexec`, `*rest`. The first two are flags that can be used to control output. The third is the path that does not exist and needs to be created. The fourth is a flag indicating that the function should not actually execute. The last is a list for accepting a variable number of arguments. These variable arguments are taken from an input file (described later) and should typically contain additional instructions for constructing a missing folder. The function should actually perform the necessary operation to construct a missing folder and should return a tuple consisting of an error code and an output string. This command will not be executed in parallel due to limitations of Python multiprocessing. Required if construction is requested and `py:makecommand` is not set. Example:
 
-	def everymakefunction(verbose, debug, path, noexec, *rest):
+	def allmakefunction(verbose, debug, path, noexec, *rest):
 		if verbose >=4: print("os.makedirs({path})".format(path=path))
 		if noexec: return 0, "[noexec] os.makedirs({path})".format(path=path)
 		os.makedirs(path)
@@ -79,7 +79,7 @@ Since the configuration file is just normal Python code, complex configurations 
 	if os.name == "nt": git.update(gitwindows)
 	else: git.update(gitlinux)
 	git["py:enable"] = True
-The default configuration file is located at `${HOME}/.onsub.py`. A partially functional [example configuration file](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) provides sample commands for [Git](https://git-scm.com/), [Mercurial](https://www.mercurial-scm.org/) and [Subversion](https://subversion.apache.org/). It also contains a section (named "every") that will allow operations on all subfolders regardless of type.
+The default configuration file is located at `${HOME}/.onsub.py`. A partially functional [example configuration file](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) provides sample commands for [Git](https://git-scm.com/), [Mercurial](https://www.mercurial-scm.org/) and [Subversion](https://subversion.apache.org/). It also contains a section (named "all") that will allow operations on all subfolders regardless of type.
 
 ### Details
 #### - Pseudo-section `colors`
@@ -111,8 +111,8 @@ Value:
 	arguments = [
 		# "--count", "10",
 		# "--debug",
-		# "--disable", "every",
-		# "--enable", "every",
+		# "--disable", "all",
+		# "--enable", "all",
 		# "--file", "subs.py",
 		# "--ignore", ".hg", "--ignore", ".git", "--ignore", ".svn",
 		# "--nocolor",
@@ -418,26 +418,26 @@ Explanation:
 	if os.name == "nt": svn.update(svnwindows)
 	else: svn.update(svnlinux)
 	svn["py:enable"] = True
-#### - Section `every`
-The example `every ` section provides some sample Linux commands and a sample Python operation function.
-##### `every ` summary
-	everymakecommand  -- Python helper function that makes a folder
-	everypriority     -- Python helper function that returns True
-	everydefault      -- Pseudo-section for all OSs 
-	everylinux        -- Pseudo-section for all Linux
-	everywindows      -- Pseudo-section for all Windows
-	every             -- Configuration section for all folders
-##### `every ` Linux
+#### - Section `all`
+The example `all ` section provides some sample Linux commands and a sample Python operation function.
+##### `all ` summary
+	allmakecommand  -- Python helper function that makes a folder
+	allpriority     -- Python helper function that returns True
+	alldefault      -- Pseudo-section for all OSs 
+	alllinux        -- Pseudo-section for all Linux
+	allwindows      -- Pseudo-section for all Windows
+	all             -- Configuration section for all folders
+##### `all ` Linux
 Composite:
 
-	every = {
+	all = {
 		py:fileCheck = <function fileCheck at 0x10507c710>
 		cwd = <cwd>
 		sep = ;
 		echo = /bin/echo
 		lswcl = ls | wc -l
-		py:priority = <function everypriority at 0x10507cc20>
-		py:makefunction = <function everymakefunction at 0x10507cb90>
+		py:priority = <function allpriority at 0x10507cc20>
+		py:makefunction = <function allmakefunction at 0x10507cb90>
 	}
 Explanation:
 
@@ -449,28 +449,28 @@ Explanation:
 	cwd              -- Inherited from default pseudo-section
 	py:priority      -- Python function that establishes a folder applies to this section
 	py:makefunction  -- Python function that makes a folder
-##### `every ` details
-	def everymakefunction(verbose, debug, path, noexec, *rest):
+##### `all ` details
+	def allmakefunction(verbose, debug, path, noexec, *rest):
 		if verbose >=4: print("os.makedirs({path})".format(path=path))
 		if noexec: return 0, "[noexec] os.makedirs({path})".format(path=path)
 		os.makedirs(path)
 		return 0, "os.makedirs({path})".format(path=path)
 	
-	def everypriority(verbose, debug, path): return 1
+	def allpriority(verbose, debug, path): return 1
 	
-	everydefault = {
-		"py:priority": everypriority,
-		"py:makefunction": everymakefunction,
+	alldefault = {
+		"py:priority": allpriority,
+		"py:makefunction": allmakefunction,
 	}
 	
-	everylinux = {}
-	everywindows = {}
+	alllinux = {}
+	allwindows = {}
 	
-	every = {}
-	every.update(default)
-	every.update(everydefault)
-	if os.name == "nt": every.update(everywindows)
-	else: every.update(everylinux)
+	all = {}
+	all.update(default)
+	all.update(alldefault)
+	if os.name == "nt": all.update(allwindows)
+	else: all.update(alllinux)
 ## Command line options
 The basic command line options, with variable outputs specified by <>, are:
 
@@ -778,31 +778,31 @@ With `--disable svn --disable hg`:
 
 Identifies `git` as `Git` folder and executes command. Only `git` section is applied.
 ### Ignore folders (---ignore IGNORE [--ignore IGNORE ...])
-With `--noenable --enable every --ignore .git --ignore .hg --ignore .svn`:
+With `--noenable --enable all --ignore .git --ignore .hg --ignore .svn`:
 
-	$ onsub --noenable --enable every --ignore .git --ignore .hg --ignore pwd
-	. (every) pwd
-	./svn (every) pwd
-	./normal (every) pwd
-	./hg (every) pwd
-	./git (every) pwd
+	$ onsub --noenable --enable all --ignore .git --ignore .hg --ignore pwd
+	. (all) pwd
+	./svn (all) pwd
+	./normal (all) pwd
+	./hg (all) pwd
+	./git (all) pwd
 	<<< RESULTS >>>
-	. (every) pwd
+	. (all) pwd
 	/tmp/sample
 	
-	./svn (every) pwd
+	./svn (all) pwd
 	/private/tmp/sample/svn
 	
-	./normal (every) pwd
+	./normal (all) pwd
 	/private/tmp/sample/normal
 	
-	./hg (every) pwd
+	./hg (all) pwd
 	/private/tmp/sample/hg
 	
-	./git (every) pwd
+	./git (all) pwd
 	/private/tmp/sample/git
 
-Visits every folder without traversing into ignored folders to execute command. 
+Visits all folder without traversing into ignored folders to execute command. 
 ### Dump config (--dump DUMP [--dump DUMP ...])
 With `--dump default`:
 
@@ -872,44 +872,44 @@ With `--dump svn`:
 			allremote = {remote}
 			py:enable = True
 	}
-With `--dump every`:
+With `--dump all`:
 
-	$ onsub --dump every
-	every = {
+	$ onsub --dump all
+	all = {
 			py:fileCheck = <function fileCheck at 0x102dbc680>
 			cwd = /private/tmp
 			sep = ;
 			echo = /bin/echo
 			lswcl = ls | wc -l
-			py:priority = <function everypriority at 0x102dbcb90>
-			py:makefunction = <function everymakefunction at 0x102dbcb00>
+			py:priority = <function allpriority at 0x102dbcb90>
+			py:makefunction = <function allmakefunction at 0x102dbcb00>
 	}
 ### Limit recursion depth (--depth)
-With `--enable every --depth 1`:
+With `--enable all --depth 1`:
 
-	$ onsub --enable every --depth 1 pwd
-	. (every) pwd
+	$ onsub --enable all --depth 1 pwd
+	. (all) pwd
 	<<< RESULTS >>>
-	. (every) pwd
+	. (all) pwd
 	/tmp/sample
 Only recurses one level deep.
 
-With `--enable every --depth 2`:
+With `--enable all --depth 2`:
 
-	$ onsub --enable every --depth 2 pwd
-	. (every) pwd
+	$ onsub --enable all --depth 2 pwd
+	. (all) pwd
 	./svn (svn) pwd
-	./normal (every) pwd
+	./normal (all) pwd
 	./hg (hg) pwd
 	./git (git) pwd
 	<<< RESULTS >>>
-	. (every) pwd
+	. (all) pwd
 	/tmp/sample
 	
 	./svn (svn) pwd
 	/private/tmp/sample/svn
 	
-	./normal (every) pwd
+	./normal (all) pwd
 	/private/tmp/sample/normal
 	
 	./hg (hg) pwd
@@ -919,40 +919,40 @@ With `--enable every --depth 2`:
 	/private/tmp/sample/git
 Recurses an additional level into working copies.
 
-With `--enable every --depth 3`:
+With `--enable all --depth 3`:
 
-	$ onsub --enable every --depth 3 pwd
-	. (every) pwd
+	$ onsub --enable all --depth 3 pwd
+	. (all) pwd
 	./svn (svn) pwd
-	./svn/.svn (every) pwd
-	./normal (every) pwd
+	./svn/.svn (all) pwd
+	./normal (all) pwd
 	./hg (hg) pwd
-	./hg/.hg (every) pwd
+	./hg/.hg (all) pwd
 	./git (git) pwd
-	./git/.git (every) pwd
+	./git/.git (all) pwd
 	<<< RESULTS >>>
-	. (every) pwd
+	. (all) pwd
 	/tmp/sample
 	
 	./svn (svn) pwd
 	/private/tmp/sample/svn
 	
-	./svn/.svn (every) pwd
+	./svn/.svn (all) pwd
 	/private/tmp/sample/svn/.svn
 	
-	./normal (every) pwd
+	./normal (all) pwd
 	/private/tmp/sample/normal
 	
 	./hg (hg) pwd
 	/private/tmp/sample/hg
 	
-	./hg/.hg (every) pwd
+	./hg/.hg (all) pwd
 	/private/tmp/sample/hg/.hg
 	
 	./git (git) pwd
 	/private/tmp/sample/git
 	
-	./git/.git (every) pwd
+	./git/.git (all) pwd
 	/private/tmp/sample/git/.git
 Recurses an additional level into working copy version control folders.
 ### No execution (--noexec)

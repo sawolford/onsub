@@ -1,8 +1,8 @@
 arguments = [
     # "--count", "10",
     # "--debug",
-    # "--disable", "every",
-    # "--enable", "every",
+    # "--disable", "all",
+    # "--enable", "all",
     # "--file", "subs.py",
     # "--ignore", ".hg", "--ignore", ".git", "--ignore", ".svn",
     # "--nocolor",
@@ -168,27 +168,27 @@ if os.name == "nt": svn.update(svnwindows)
 else: svn.update(svnlinux)
 svn["py:enable"] = True
 
-def everymakefunction(verbose, debug, path, noexec, *rest):
+def allmakefunction(verbose, debug, path, noexec, *rest):
     if verbose >=4: print("os.makedirs({path})".format(path=path))
     if noexec: return 0, "[noexec] os.makedirs({path})".format(path=path)
     os.makedirs(path)
     return 0, "os.makedirs({path})".format(path=path)
 
-def everypriority(verbose, debug, path): return 1
+def allpriority(verbose, debug, path): return 1
 
-everydefault = {
-    "py:priority": everypriority,
-    "py:makefunction": everymakefunction,
+alldefault = {
+    "py:priority": allpriority,
+    "py:makefunction": allmakefunction,
 }
 
-everylinux = {}
-everywindows = {}
+alllinux = {}
+allwindows = {}
 
-every = {}
-every.update(default)
-every.update(everydefault)
-if os.name == "nt": every.update(everywindows)
-else: every.update(everylinux)
+all = {}
+all.update(default)
+all.update(alldefault)
+if os.name == "nt": all.update(allwindows)
+else: all.update(alllinux)
 
 localpy = f"{HOME()}/.onsub,local.py"
 if os.path.exists(localpy): exec(open(localpy).read(), globals(), locals())
