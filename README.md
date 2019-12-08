@@ -1074,7 +1074,8 @@ Assume a program, `hgcheck`, is in the shell command search path and contains th
 		return out.count("\n")
 	
 	def hgcheck(verbose, debug, path, noexec, *rest):
-		if noexec: return 0, "[noexec] py:check"
+		if noexec: return 0, "[noexec] hgcheck"
+		if not os.path.exists(".hg"): return 0, "[not an hg clone]"
 		nheads = outcount("hg heads -q .")
 		nparents = outcount("hg parents -q")
 		if nheads == 2 and nparents == 2: return 1, 'onsub --chdir {path} --workers 1 --depth 1 {{continue}}'.format(path=path)
