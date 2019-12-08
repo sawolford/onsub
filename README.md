@@ -1387,7 +1387,7 @@ At this point, we could issue a `get` command and bring all working copies up-to
 	<<< ERRORS >>>
 	(3) ./hgout (hg) hgcheck
 	onsub --chdir /private/tmp/sample/hgout --workers 1 --depth 1 {write}
-We now have a local changer to commit but we'd rather not commit that change now. Instead, we'll issue another `sync` command followed by `check`:
+We now have a local change to commit but we'd rather not commit that change now. Instead, we'll issue another `sync` command followed by `check`:
 
 	$ onsub {sync}
 	./hgwc (hg) hg pull --rebase -t internal:fail ; hg pull --update

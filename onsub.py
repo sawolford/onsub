@@ -148,7 +148,7 @@ def sighandler(signum, frame):
     sys.exit()
     return
 
-def waitFutures(verbose, nocolor, colors, futures):
+def waitFutures(verbose, debug, nocolor, colors, futures):
     results = []
     while True:
         nfutures = []
@@ -164,6 +164,17 @@ def waitFutures(verbose, nocolor, colors, futures):
         futures = nfutures
         continue
     return results
+
+def dispResults(verbose, debug, nocolor, colors, partition, results):
+    nerrors = 0
+    if len(results):
+        tc.cprint(partition, color(nocolor, colors, "partition"))
+        for pheader, cheader, ec, out in results:
+            if ec: nerrors += 1
+            display(verbose, nocolor, colors, pheader, cheader, ec, out)
+            continue
+        pass
+    return nerrors
 
 def main():
     global futures
@@ -304,9 +315,12 @@ def main():
             futures.append(future)
             pass
         continue
-    waitFutures(verbose, nocolor, colors, futures)
+    results = waitFutures(verbose, debug, nocolor, colors, futures)
+    nerrors = dispResults(verbose, debug, nocolor, colors, "<<< MAKE >>>", results)
+    if noop: return nerrors
 
     root = os.getcwd()
+    futures = []
     errors = []
     if len(files) > 0: cmdIterate = fileIterate
     else: cmdIterate = pathIterate
@@ -346,17 +360,9 @@ def main():
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, nocolor, colors, futures)
+    results = waitFutures(verbose, debug, nocolor, colors, futures)
 
-    nerrors = 0
-    if len(results):
-        tc.cprint("<<< RESULTS >>>", color(nocolor, colors, "partition"))
-        for pheader, cheader, ec, out in results:
-            if ec: nerrors += 1
-            display(verbose, nocolor, colors, pheader, cheader, ec, out)
-            continue
-        pass
-    
+    nerrors = dispResults(verbose, debug, nocolor, colors, "<<< RESULTS >>>", results)
     if not suppress and verbose >= 1 and nerrors > 0:
         tc.cprint("<<< ERRORS >>>", color(nocolor, colors, "partition"))
         for pheader, cheader, ec, out in results:
