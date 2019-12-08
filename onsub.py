@@ -128,8 +128,8 @@ def genParser():
     parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str)
     parser.add_argument("--py:openbrace", dest="pyopenbrace", help="key for py:openbrace", type=str)
     parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str)
-    parser.add_argument("--sleepmake", help="sleep between calls", type=float)
-    parser.add_argument("--sleepcommand", help="sleep between calls", type=float)
+    parser.add_argument("--sleepmake", help="sleep between make calls", type=float)
+    parser.add_argument("--sleepcommand", help="sleep between command calls", type=float)
     parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
     parser.add_argument("--verbose", help="verbose level", type=int)
     parser.add_argument("--workers", help="number of workers", type=int)
@@ -310,19 +310,22 @@ def main():
     errors = []
     if len(files) > 0: cmdIterate = fileIterate
     else: cmdIterate = pathIterate
-    for path, _, _ in cmdIterate(ignores):
+    for path, fsection, _ in cmdIterate(ignores):
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         
-        maxsection = (0, "")
-        for section, priority in priorities.items():
-            with pd.pushd(path): pvalue = priority(verbose, debug, path)
-            if pvalue > maxsection[0]:
-                maxsection = (pvalue, section)
-                pass
-            continue
-        if maxsection[0] == 0: continue
-        section = maxsection[1]
+        if fsection: section = fsection
+        else:
+            maxsection = (0, "")
+            for section, priority in priorities.items():
+                with pd.pushd(path): pvalue = priority(verbose, debug, path)
+                if pvalue > maxsection[0]:
+                    maxsection = (pvalue, section)
+                    pass
+                continue
+            if maxsection[0] == 0: continue
+            section = maxsection[1]
+            pass
         with pd.pushd(path): rc = readConfig(configfile, configs)
         default = rc[section]
         time.sleep(sleepcommand)

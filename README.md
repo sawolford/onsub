@@ -3,7 +3,7 @@
 ## Summary
 The onsub.py command iterates over subfolders to execute arbitrary commands as dictated by command line arguments and a Python configuration file. The main code consists of two (2) Python files: an example Python-configuration file that is meant to be user configurable and the onsub.py script that executes commands as dictated by command line arguments and the configuration file.
 
-All provided files, with a short descrption, are:
+All provided files, with a short description, are:
 
 	- onsub.py            -- the main execution code (~400 lines)
 	- onsub               -- very short python script that calls onsub.py
@@ -12,9 +12,9 @@ All provided files, with a short descrption, are:
 	- guestrepo2onsub.py  -- converter from guestrepo to onsub syntax
 	- onsub2file.py       -- prints to stdout a file listing of prioritized folders 
 	- README.md           -- this file
-The configuration file is described later but it is organized into sections and provides rules for operation. The`onsub` command can be run in two main modes: file mode and recurse mode.
+The configuration file is described later but it is organized into sections and provides rules for operation. The `onsub` command can be run in two main modes: file mode and recurse mode.
 
-The first mode of operation is file mode, where a special file is provided indicating which subfolders are to be visited and, optionally, information about how to create them if they are missing. If a command is provided and this triggers folder creation because an expected folder is not present, then the folder creation is run serially to ensure that the expected onsub command has a folder to execute in. If no command is provided (i.e., noop) and an expected folder is not present, then the folder creations will be run in parallel if possible. If the creation operations cannot be run in parallel, then the creation operations can be mutually dependent if necessary and if specified in the proper order.
+The first mode of operation is file mode, where a special file is provided indicating which subfolders are to be visited and, optionally, information about how to create them if they are missing. If a command is provided and this triggers folder creation because an expected folder is not present, then the folder creation is run serially to ensure that the expected `onsub` command has a folder to execute in. If no command is provided (i.e., noop) and an expected folder is not present, then the folder creations will be run in parallel if possible. If the creation operations cannot be run in parallel, then the creation operations can be mutually dependent if necessary and if specified in the proper order.
 
 File mode is indicated by the `--file FILE` command line argument. The `FILE` parameter indicates the input file of expected folders, grouped by section (described below)) and, optionally, additional arguments for each expected folder. If the `--noop` command line argument is provided, then this mode can be used to construct all of the folders described by `FILE` in parallel according to rules for the corresponding section in the configuration file.  Example:
 
@@ -34,7 +34,7 @@ Both modes will execute commands according to the provided command line argument
 	$ onsub {cmd} status             # recurses to all subfolders and runs "{cmd} status"
 	$ onsub pwd                      # recurses to all subfolders and runs "pwd"
 ## Configuration
-The configuration file for `onsub` is nothing but a Python script, so it follows normal Python syntax rules. The code is interpreted by `onsub` as a color configuration list (`colors`), a default argument list (`arguments`), and a set of Python dictionaries, each or which is known as a section. The `colors` list instructs `onsub` how to colorize output. The `arguments` list contains arguments that always passed to `onsub`. Each section is just a normal Python dictionary with keys and values. Sections are optional but, in the absence of extensive command line arguments, essentially required for onsub to do useful work.
+The configuration file for `onsub` is nothing but a Python script, so it follows normal Python syntax rules. The code is interpreted by `onsub` as a color configuration list (`colors`), a default argument list (`arguments`), and a set of Python dictionaries, each or which is known as a section. The `colors` list instructs `onsub` how to colorize output. The `arguments` list contains arguments that are always passed to `onsub`. Each section is just a normal Python dictionary with keys and values. Sections are optional but, in the absence of extensive command line arguments, essentially required for onsub to do useful work.
 
 The section names and most of the contents are arbitrary but are interpreted by `onsub` in such a way that work may be performed on file folders. Most dictionary keys in a section entry are completely arbitrary and will be passed to the Python `string.format()` function in order to construct shell commands. This formatting process is repeated a set number of times or until the string no longer changes. If a key is prefixed by `py:`, then the value is instead interpreted as a Python function whose arguments are prescribed for certain keys (described below) or just a list of remaining command line arguments.
 
@@ -65,7 +65,7 @@ Python function taking five (5) arguments: `verbose`, `debug`, `path`, `noexec`,
 		os.makedirs(path)
 		return 0, "os.makedirs({path})".format(path=path)
 #### - string.format() strings
-Other dictionary entries are strings that can contain Python variable substitution specifiers compatible with the Python `string.format()` standard method. Variables are substituted from the same section dictinoary. This variable substitution is performed iteratively a set number of times or until the string no longer changes. Example:
+Other dictionary entries are strings that can contain Python variable substitution specifiers compatible with the Python `string.format()` standard method. Variables are substituted from the same section dictionary. This variable substitution is performed iteratively a set number of times or until the string no longer changes. Example:
 
 	"cmd": "git"
 	"-v": "-v"
@@ -138,7 +138,7 @@ The example `default` section provides some sample Linux commands and a sample P
 ##### `default` summary
 	fileCheck   -- Python helper function that checks if a file exists in a folder
 	defdefault  -- Pseudo-section used by default for all OSs
-	deflinux    -- Pseudo-section used by defualt for Linux
+	deflinux    -- Pseudo-section used by default for Linux
 	defwindows  -- Pseudo-section used by default for Windows
 	default     -- Pseudo-section used by later sections
 ##### `default` Linux
@@ -213,10 +213,6 @@ Composite:
 		remote = {cmd} remote -v
 		allremote = {remote}
 		py:enable = True
-		py:check = <function gitcheck at 0x107f08200>
-		check = {echo} [unimplemented]
-		sync = {echo} [unimplemented]
-		py:repin = <function <lambda> at 0x107f08f80>
 	}
 Explanation:
 
@@ -517,8 +513,8 @@ The basic command line options, with variable outputs specified by <>, are:
 	  --py:makefunction PYMAKEFUNCTION  key for py:makefunction
 	  --py:openbrace PYOPENBRACE        key for py:openbrace
 	  --py:priority PYPRIORITY          key for py:priority
-	  --sleepmake SLEEPMAKE             sleep between calls
-	  --sleepcommand SLEEPCOMMAND       sleep between calls
+	  --sleepmake SLEEPMAKE             sleep between make calls
+	  --sleepcommand SLEEPCOMMAND       sleep between command calls
 	  --suppress                        suppress repeated error output
 	  --verbose VERBOSE                 verbose level
 	  --workers WORKERS                 number of workers
@@ -541,7 +537,7 @@ Changes directory before execution.
 Type: Option<br>
 Default: None<br>
 Option: `CONFIG`<br>
-Repeate: Yes<br><br>
+Repeat: Yes<br><br>
 Appends `CONFIG` lines to configuration, one at a time. Can be used to alter configuration for a single command execution.
 ### --configfile CONFIGFILE
 	--configfile CONFIGFILE           config file
@@ -562,7 +558,7 @@ Indicates that `COUNT` is the maximum number of times to recursively substitute 
 Type: Flag<br>
 Default: False<br>
 Option: \<none><br>
-Repeate: No<br><br>
+Repeat: No<br><br>
 Causes `onsub` to output more diagnostic information. Is also passed to `py:` functions where they occur in configuration entries.
 ### --depth DEPTH
 	--depth DEPTH                     walk depth
@@ -685,19 +681,19 @@ Option: `PYPRIORITY`<br>
 Repeat: No<br><br>
 Names `PYPRIORITY` as the key to look up in each configuration section for checking to see if a section applies to a folder.
 ### --sleepmake SLEEPMAKE
-	  --sleepmake SLEEPMAKE             sleep between calls
+	  --sleepmake SLEEPMAKE             sleep between make calls
 Type: Option<br>
 Default: 0.1<br>
 Option: `SLEEPMAKE`<br>
 Repeat: No<br><br>
-Sets the sleep value to issue betwee make folder commands. Can be used to limit server connections.
+Sets the sleep value to issue between make folder commands. Can be used to limit server connections.
 ### --sleepcommand SLEEPCOMMAND
-	--sleepcommand SLEEPCOMMAND       sleep between calls
+	--sleepcommand SLEEPCOMMAND       sleep between command calls
 Type: Option<br>
 Default: 0<br>
 Option: `SLEEPCOMMAND `<br>
 Repeat: No<br><br>
-Sets the sleep value to issue betwee recursive commands. Can be used to limit server connections.
+Sets the sleep value to issue between recursive commands. Can be used to limit server connections.
 ### --suppress
 	--suppress                        suppress repeated error output
 Type: Flag<br>
@@ -718,16 +714,16 @@ Sets the level of output to be included in command execution where higher number
 3. Output path, applicable section, and command<br>
 4. Output one line for each command (at point of execution)<br>
 5. Output of commands as execution finishes<br>
-6. Output of make commads as make execution finishes<br>
+6. Output of make commands as make execution finishes<br>
 ### --workers WORKERS
 	--workers WORKERS                 number of workers
 Type: Option<br>
 Default: \<number of cores><br>
 Option: `WORKERS`<br>
-Repeate: No<br><br>
+Repeat: No<br><br>
 Sets the number of simultaneous worker processes to use.
 ## Simple Examples
-Simple examples of using onsub are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Mac. The directory structure is assumed to be the following:
+Simple examples of using `onsub` are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Mac. The directory structure is assumed to be the following:
 
 	git/
 	git/.git
@@ -760,8 +756,8 @@ With `--noenable`:
 
 	$ onsub --noenable pwd
 
-No sections are enabled so no commands are execued.
-### Enable sections (--enable ENABLE)
+No sections are enabled so no commands are executed.
+### Enable section (--enable ENABLE)
 With `--noenable --enable git`:
 
 	$ onsub --noenable --enable git pwd
@@ -813,7 +809,7 @@ With `--dump default`:
 	$ onsub --dump default
 	default = {
 			py:fileCheck = <function fileCheck at 0x103f3d680>
-			cwd = /Users/swolford/onsub
+			cwd = /private/tmp
 			sep = ;
 			echo = /bin/echo
 			lswcl = ls | wc -l
@@ -823,7 +819,7 @@ With `--dump git`:
 	$ onsub --dump git
 	git = {
 			py:fileCheck = <function fileCheck at 0x10359e680>
-			cwd = /Users/swolford/onsub
+			cwd = /private/tmp
 			sep = ;
 			echo = /bin/echo
 			lswcl = ls | wc -l
@@ -842,7 +838,7 @@ With `--dump hg`:
 	$ onsub --dump hg
 	hg = {
 			py:fileCheck = <function fileCheck at 0x10eaa4680>
-			cwd = /Users/swolford/onsub
+			cwd = /private/tmp
 			sep = ;
 			echo = /bin/echo
 			lswcl = ls | wc -l
@@ -862,7 +858,7 @@ With `--dump svn`:
 	$ onsub --dump svn
 	svn = {
 			py:fileCheck = <function fileCheck at 0x109025680>
-			cwd = /Users/swolford/onsub
+			cwd = /private/tmp
 			sep = ;
 			echo = /bin/echo
 			lswcl = ls | wc -l
@@ -881,7 +877,7 @@ With `--dump every`:
 	$ onsub --dump every
 	every = {
 			py:fileCheck = <function fileCheck at 0x102dbc680>
-			cwd = /Users/swolford/onsub
+			cwd = /private/tmp
 			sep = ;
 			echo = /bin/echo
 			lswcl = ls | wc -l
@@ -989,7 +985,7 @@ With `--noop`:
 	./git (git)
 Identifies `svn` as a `Subversion` folder, `hg` as a `Mercurial`, and `git` as a `Git` folder but doesn't execute any command in those folders.
 ## Git examples
-Complex Git examples of using onsub are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Mac. The file `input.py` is assumed to contain the following:
+Complex Git examples of using `onsub` are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Mac. The file `input.py` is assumed to contain the following:
 
 	git = [
 		("./onsub1", "https://bitbucket.org/sawolford/onsub.git"),
@@ -1050,7 +1046,7 @@ With `--chdir onsub1 {cmd} pull`:
 	Already up to date.
 Changes directory to `onsub1` and executes `pull` command.
 ## Mercurial Examples
-Complex Mercurial examples of using onsub are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Mac.
+Complex Mercurial examples of using `onsub` are below. The configuration file is assumed to be [example,onsub.py](https://bitbucket.org/sawolford/onsub/src/master/example,onsub.py) and it is executed on a Mac.
 
 Assume a program, `hgcheck`, is in the shell command search path and contains the following Python code:
 
@@ -1106,6 +1102,11 @@ Also, assume the `hg` configuration section includes the following commands:
 	continue = {cmd} resolve --re-merge --all {sep} hg rebase --continue
 	finish = {cmd} shelve {sep} hg rebase {sep} hg unshelve
 	mix = {cmd} pull --rebase
+And the `arguments` list contains (at least):
+
+	arguments = [
+		"--ignore", "hgsrc",
+	]
 Prepare the sample folder with the following commands:
 
 	$ hg init hgsrc
@@ -1127,11 +1128,11 @@ Prepare the sample folder with the following commands:
 	$ echo hgout > file.txt
 	$ hg ci -m "changed file.txt"
 	$ cd ..
-At this point, there's a "remote" repository (`hgsrc`), a local clone with working copy changes (`hgwc`), and a local clone with local commits (`hgout`). For the following steps, the `hgsrc` folder will be ignored for easier understanding.
+At this point, there's a "remote" repository (`hgsrc`), a local clone with working copy changes (`hgwc`), and a local clone with local commits (`hgout`). For the following steps, the `hgsrc` folder will be ignored for easier understanding, as specified by the `arguments` configuration.
 
 Determine current state of clones with `{check}`:
 
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1153,7 +1154,7 @@ Since the only commands recommended for execution are `write` and `put`, we can 
 	<<< RESULTS >>>
 	. (hg) hg ci
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1179,7 +1180,7 @@ Now, we can execute a `put` command followed by a `check`:
 	adding file changes
 	added 1 changesets with 1 changes to 1 files
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1193,7 +1194,7 @@ Now, we can execute a `put` command followed by a `check`:
 	onsub --chdir /private/tmp/sample/hgout --workers 1 --depth 1 {mix}
 Error `6` indicates that the `hgout` folder has both incoming and outgoing changesets. We now need to issue a `sync` command followed by a `check` to prepare that folder for rebasing:
 
-	$ onsub --ignore hgsrc {sync}
+	$ onsub {sync}
 	./hgwc (hg) hg pull --rebase -t internal:fail ; hg pull --update
 	./hgout (hg) hg pull --rebase -t internal:fail ; hg pull --update
 	<<< RESULTS >>>
@@ -1219,7 +1220,7 @@ Error `6` indicates that the `hgout` folder has both incoming and outgoing chang
 	searching for changes
 	no changes found
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1245,7 +1246,7 @@ Error `1` indicates that folder has a rebase to to continue. Executing the `cont
 	rebasing 1:288098ad71dd "changed file.txt"
 	saved backup bundle to /private/tmp/sample/hgout/.hg/strip-backup/288098ad71dd-2f436550-rebase.hg
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1271,7 +1272,7 @@ Pushing our changeset with `put` followed by `check`:
 	adding file changes
 	added 1 changesets with 1 changes to 1 files
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1285,7 +1286,7 @@ Pushing our changeset with `put` followed by `check`:
 	onsub --chdir /private/tmp/sample/hgwc --workers 1 --depth 1 {write}
 In this case, we don't actually want to commit that change but we would rather keep it as a working copy change. We'll issue a `sync` command followed by `check` instead:
 
-	$ onsub --ignore hgsrc {sync}
+	$ onsub {sync}
 	./hgwc (hg) hg pull --rebase -t internal:fail ; hg pull --update
 	./hgout (hg) hg pull --rebase -t internal:fail ; hg pull --update
 	<<< RESULTS >>>
@@ -1311,7 +1312,7 @@ In this case, we don't actually want to commit that change but we would rather k
 	running merge tool kdiff3 for file file.txt
 	0 files updated, 1 files merged, 0 files removed, 0 files unresolved
 	
-	$ onsub --file hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1323,14 +1324,14 @@ In this case, we don't actually want to commit that change but we would rather k
 	<<< ERRORS >>>
 	(3) ./hgwc (hg) hgcheck
 	onsub --chdir /private/tmp/sample/hgwc --workers 1 --depth 1 {write}
-Following the conlict merge to update the working copy, we can see that we have one dirty working copy. We'll commit that change now with the `write` command followed by `check`:
+Following the conflict merge to update the working copy, we can see that we have one dirty working copy. We'll commit that change now with the `write` command followed by `check`:
 
 	$ onsub --chdir /private/tmp/sample/hgwc --workers 1 --depth 1 {write}
 	. (hg) hg ci
 	<<< RESULTS >>>
 	. (hg) hg ci
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1355,7 +1356,7 @@ We can now push that changeset with the `put` command followed by `check`:
 	adding file changes
 	added 1 changesets with 1 changes to 1 files
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1374,7 +1375,7 @@ At this point, we could issue a `get` command and bring all working copies up-to
 	$ hg ci -m "added hgout"
 	$ echo hgout hgwc hgout hgwc > file.txt
 	$ cd ..
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1388,7 +1389,7 @@ At this point, we could issue a `get` command and bring all working copies up-to
 	onsub --chdir /private/tmp/sample/hgout --workers 1 --depth 1 {write}
 We now have a local changer to commit but we'd rather not commit that change now. Instead, we'll issue another `sync` command followed by `check`:
 
-	$ onsub --ignore hgsrc {sync}
+	$ onsub {sync}
 	./hgwc (hg) hg pull --rebase -t internal:fail ; hg pull --update
 	./hgout (hg) hg pull --rebase -t internal:fail ; hg pull --update
 	<<< RESULTS >>>
@@ -1414,7 +1415,7 @@ We now have a local changer to commit but we'd rather not commit that change now
 	searching for changes
 	no changes found
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1443,7 +1444,7 @@ Error `2` indicates that we have a rebase to finish. Executing `finish` followed
 	merging file.txt
 	running merge tool kdiff3 for file file.txt
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1462,7 +1463,7 @@ We now have a dirty working copy. Executing the `write` command followed by `che
 	<<< RESULTS >>>
 	. (hg) hg ci
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1487,7 +1488,7 @@ We now have a changeset to push. Executing the `put` command followed by `check`
 	adding file changes
 	added 2 changesets with 2 changes to 1 files
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
@@ -1514,7 +1515,7 @@ Finally, we have an incoming changeset to pull. Executing the `get` command foll
 	new changesets 270ca80b054a:8e21673a6413
 	1 files updated, 0 files merged, 0 files removed, 0 files unresolved
 	
-	$ onsub --ignore hgsrc {check}
+	$ onsub {check}
 	./hgwc (hg) hgcheck
 	./hgout (hg) hgcheck
 	<<< RESULTS >>>
