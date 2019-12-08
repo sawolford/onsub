@@ -19,7 +19,9 @@ def error(code, *args, **kwargs):
 
 def format(st, rc, openbrace, closebrace, count):
     while count >= 0:
-        nst = st.format(**rc)
+        try: nst = st.format(**rc)
+        except ValueError as exc: error(9, "Invalid substitution string: {exc}".format(exc=exc))
+        except KeyError as exc: error(10, "Substitution not found: {exc}".format(exc=exc))
         if nst == st: break
         st = nst
         count -= 1
@@ -369,5 +371,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = main()
-    if rv >= 247: print("Errors exceed 247", file=sys.stderr)
+    if rv >= 245: print("Errors exceed 245", file=sys.stderr)
     sys.exit(rv)
