@@ -475,8 +475,8 @@ Explanation:
 The basic command line options, with variable outputs specified by <>, are:
 
 	usage: onsub [-h] [--chdir CHDIR] [--config CONFIG] [--configfile CONFIGFILE] [--count COUNT] [--debug] [--depth DEPTH]
-				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--ignore IGNORE] [--nocolor]
-				 [--noenable] [--noexec] [--nofile] [--noignore] [--noop] [--py:closebrace PYCLOSEBRACE]
+				 [--disable DISABLE] [--dump DUMP] [--dumpall] [--enable ENABLE] [--file FILE] [--ignore IGNORE] [--invert]
+				 [--nocolor] [--noenable] [--noexec] [--nofile] [--noignore] [--noop] [--py:closebrace PYCLOSEBRACE]
 				 [--py:enable PYENABLE] [--py:makecommand PYMAKECOMMAND] [--py:makefunction PYMAKEFUNCTION]
 				 [--py:openbrace PYOPENBRACE] [--py:priority PYPRIORITY] [--sleepmake SLEEPMAKE]
 				 [--sleepcommand SLEEPCOMMAND] [--suppress] [--verbose VERBOSE] [--workers WORKERS]
@@ -501,6 +501,7 @@ The basic command line options, with variable outputs specified by <>, are:
 	  --enable ENABLE                   enable section
 	  --file FILE                       file with folder names
 	  --ignore IGNORE                   ignore folder names
+	  --invert                          invert error codes
 	  --nocolor                         disables colorized output
 	  --noenable                        no longer enable any sections
 	  --noexec                          do not actually execute
@@ -610,6 +611,13 @@ Default: None<br>
 Option: `IGNORE`<br>
 Repeat: Yes<br><br>
 Sets folder names that will not visited when recursively searching file system.
+### --invert
+	--invert                          invert error codes
+Type: Flag<br>
+Default: False<br>
+Option: \<none><br>
+Repeat: No<br><br>
+Whether to invert error codes.
 ### --nocolor
 	--nocolor                         disables colorized output
 Type: Flag<br>

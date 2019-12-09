@@ -116,6 +116,7 @@ def genParser():
     parser.add_argument("--enable", help="enable section", action="append")
     parser.add_argument("--file", help="file with folder names", action="append")
     parser.add_argument("--ignore", help="ignore folder names", action="append")
+    parser.add_argument("--invert", help="invert error codes", action="store_true")
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true")
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true")
     parser.add_argument("--noexec", help="do not actually execute", action="store_true")
@@ -148,7 +149,7 @@ def sighandler(signum, frame):
     sys.exit()
     return
 
-def waitFutures(verbose, debug, nocolor, colors, futures):
+def waitFutures(verbose, debug, nocolor, colors, invert, futures):
     results = []
     while True:
         nfutures = []
@@ -156,7 +157,7 @@ def waitFutures(verbose, debug, nocolor, colors, futures):
             if future.done():
                 pheader, cheader, ec, out = future.result()
                 if verbose >= 5: display(verbose, nocolor, colors, pheader, cheader, ec, out)
-                results.append((pheader, cheader, ec, out))
+                results.append((pheader, cheader, ec if not invert else not ec, out))
                 pass
             else: nfutures.append(future)
             continue
@@ -168,7 +169,7 @@ def waitFutures(verbose, debug, nocolor, colors, futures):
 def dispResults(verbose, debug, nocolor, colors, partition, results):
     nerrors = 0
     if len(results):
-        tc.cprint(partition, color(nocolor, colors, "partition"))
+        if verbose >= 2: tc.cprint(partition, color(nocolor, colors, "partition"))
         for pheader, cheader, ec, out in results:
             if ec: nerrors += 1
             display(verbose, nocolor, colors, pheader, cheader, ec, out)
@@ -181,7 +182,9 @@ def main():
     signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_IGN)
     if os.name == "nt": os.system("color")
     parser = genParser()
-    cmdargs = parser.parse_args()
+    try: onsub = os.environ["ONSUB"].split()
+    except KeyError: onsub = []
+    cmdargs = parser.parse_args(onsub + sys.argv[1:])
     configfile = getValue(cmdargs.configfile, None, f'{HOME()}/.onsub.py')
     rc = readConfig(configfile, [])
     rcarguments = rc["arguments"] if "arguments" in rc else []
@@ -195,6 +198,7 @@ def main():
     dumps = cmdargs.dump or []
     dumpall = getValue(cmdargs.dumpall, None, False)
     enables = (cmdargs.enable or []) + (fileargs.enable or [])
+    invert = getValue(cmdargs.invert, None, False)
     nocolor = getValue(cmdargs.nocolor, fileargs.nocolor, False)
     noenable = getValue(cmdargs.noenable, fileargs.noenable, False)
     noexec = getValue(cmdargs.noexec, fileargs.noexec, False)
@@ -315,7 +319,7 @@ def main():
             futures.append(future)
             pass
         continue
-    results = waitFutures(verbose, debug, nocolor, colors, futures)
+    results = waitFutures(verbose, debug, nocolor, colors, invert, futures)
     nerrors = dispResults(verbose, debug, nocolor, colors, "<<< MAKE >>>", results)
     if noop: return nerrors
 
@@ -360,7 +364,7 @@ def main():
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, debug, nocolor, colors, futures)
+    results = waitFutures(verbose, debug, nocolor, colors, invert, futures)
 
     nerrors = dispResults(verbose, debug, nocolor, colors, "<<< RESULTS >>>", results)
     if not suppress and verbose >= 1 and nerrors > 0:
