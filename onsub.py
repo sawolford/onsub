@@ -3,10 +3,12 @@ import os, signal, sys, time
 import argparse as ap
 import subprocess as sp
 import multiprocessing as mp
-import termcolor as tc
+import colorama as ca
+from colorama import Fore, Back, Style
 import pebble as pb
 import runpy as rp
 import pushd as pd
+import onsubdefaults as od
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -20,8 +22,8 @@ def error(code, *args, **kwargs):
 def format(st, rc, openbrace, closebrace, count):
     while count >= 0:
         try: nst = st.format(**rc)
-        except ValueError as exc: error(9, "Invalid substitution string: {exc}".format(exc=exc))
-        except KeyError as exc: error(10, "Substitution not found: {exc}".format(exc=exc))
+        except ValueError as exc: error(256 - 8, "Invalid substitution string: {exc}".format(exc=exc))
+        except KeyError as exc: error(256 - 9, "Substitution not found: {exc}".format(exc=exc))
         if nst == st: break
         st = nst
         count -= 1
@@ -61,8 +63,10 @@ def cdwork(path, cmd, section, verbose, debug, noexec, cd):
     return rv
 
 def color(nocolor, colors, color):
-    if nocolor: return None
-    return colors[color]
+    if nocolor: return ""
+    try: return colors[color]
+    except KeyError: pass
+    return od.colors[color]
 
 class pyfuncfuture:
     def __init__(self, pheader, cheader, ec, out):
@@ -82,8 +86,9 @@ def HOME():
     homepath = os.environ["HOMEPATH"]
     return "{homedrive}/{homepath}".format(homedrive=homedrive, homepath=homepath)
 
-def readConfig(configfile, configs):
-    rc = rp.run_path(configfile, globals())
+def readConfig(configfile, configs=[]):
+    rc = od.__dict__.copy()
+    if os.path.exists(configfile): rc.update(rp.run_path(configfile, globals()))
     for config in configs:
         exec(config, globals(), rc)
         continue
@@ -91,13 +96,13 @@ def readConfig(configfile, configs):
 
 def display(verbose, nocolor, colors, pheader, cheader, ec, out):
     if verbose >= 3:
-        tc.cprint(pheader, color(nocolor, colors, "path"), end="")
-        tc.cprint(" ", end="")
-        tc.cprint(cheader, color(nocolor, colors, "command"))
+        print(color(nocolor, colors, "path") + pheader, end="")
+        print(" ", end="")
+        print(color(nocolor, colors, "command") + cheader)
         pass
     if verbose >= 2:
-        if ec: tc.cprint(out, color(nocolor, colors, "bad"))
-        else: tc.cprint(out, color(nocolor, colors, "good"))
+        if ec: print(color(nocolor, colors, "bad") + out)
+        else: print(color(nocolor, colors, "good") + out)
         pass
     return
 
@@ -169,7 +174,7 @@ def waitFutures(verbose, debug, nocolor, colors, invert, futures):
 def dispResults(verbose, debug, nocolor, colors, partition, results):
     nerrors = 0
     if len(results):
-        if verbose >= 2: tc.cprint(partition, color(nocolor, colors, "partition"))
+        if verbose >= 2: print(color(nocolor, colors, "partition") + partition)
         for pheader, cheader, ec, out in results:
             if ec: nerrors += 1
             display(verbose, nocolor, colors, pheader, cheader, ec, out)
@@ -180,13 +185,13 @@ def dispResults(verbose, debug, nocolor, colors, partition, results):
 def main():
     global futures
     signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_IGN)
-    if os.name == "nt": os.system("color")
+    ca.init(autoreset=True)
     parser = genParser()
     try: onsub = os.environ["ONSUB"].split()
     except KeyError: onsub = []
     cmdargs = parser.parse_args(onsub + sys.argv[1:])
     configfile = getValue(cmdargs.configfile, None, f'{HOME()}/.onsub.py')
-    rc = readConfig(configfile, [])
+    rc = readConfig(configfile)
     rcarguments = rc["arguments"] if "arguments" in rc else []
     fileargs = parser.parse_args(rcarguments)
     chdir = getValue(cmdargs.chdir, None, None)
@@ -251,8 +256,8 @@ def main():
             continue
         return
     
-    if not os.path.exists(configfile): error(256 - 3, 'Configuration file {configfile} does not exist'.format(configfile=configfile))
     rc = readConfig(configfile, configs)
+    colors = rc["colors"]
     priorities = {}
     dumpFound = False
     for section, vv in rc.items():
@@ -274,23 +279,12 @@ def main():
         except KeyError: defenable = False
         if ((noenable or not defenable) and not enable) or disable: continue
         try: priority = default[pypriority]
-        except KeyError: error(256 - 4, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
+        except KeyError: error(256 - 3, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
         priorities[section] = priority
         continue
     if len(dumps) > 0:
-        if not dumpFound: error(256 - 5, "No matching sections found")
+        if not dumpFound: error(256 - 4, "No matching sections found")
         return 0
-
-    colors = {
-        "path": "blue",
-        "command": "cyan",
-        "good": "green",
-        "bad": "magenta",
-        "error": "red",
-        "partition": "yellow",
-    }
-    try: colors.update(rc["colors"])
-    except KeyError: pass
 
     pool = pb.ProcessPool(max_workers=workers)
     signal.signal(signal.SIGINT, sighandler)
@@ -298,14 +292,14 @@ def main():
     for path, section, entry in fileIterate(ignores):
         if not entry: entry = tuple()
         if not os.path.exists(path):
-            if section not in priorities: error(256 - 6, "No section applies to {section} = {path}".format(section=section, path=path))
+            if section not in priorities: error(256 - 5, "No section applies to {section} = {path}".format(section=section, path=path))
             rc = readConfig(configfile, configs)
             default = rc[section]
             makefunction = makecommand = None
             try: makecommand = default[pymakecommand]
             except KeyError:
                 try: makefunction = default[pymakefunction]
-                except: error(256 - 7, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+                except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                 pass
             time.sleep(sleepmake)
             if makecommand:
@@ -353,7 +347,7 @@ def main():
             pheader = "{path} ({section})".format(path=path, section=section)
             cheader = "{cmd}".format(cmd=cmd)
             try: pyfunc = default[cmd]
-            except KeyError: error(256 - 8, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
+            except KeyError: error(256 - 7, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
             with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
             if verbose >= 6: display(verbose, nocolor, colors, pheader, cheader, ec, out)
@@ -368,15 +362,15 @@ def main():
 
     nerrors = dispResults(verbose, debug, nocolor, colors, "<<< RESULTS >>>", results)
     if not suppress and verbose >= 1 and nerrors > 0:
-        tc.cprint("<<< ERRORS >>>", color(nocolor, colors, "partition"))
+        print(color(nocolor, colors, "partition") + "<<< ERRORS >>>")
         for pheader, cheader, ec, out in results:
             if not ec: continue
-            tc.cprint("({ec})".format(ec=ec), color(nocolor, colors, "error"), end="")
-            tc.cprint(" ", end="")
-            tc.cprint(pheader, color(nocolor, colors, "path"), end="")
-            tc.cprint(" ", end="")
-            tc.cprint(cheader, color(nocolor, colors, "command"))
-            tc.cprint(out, color(nocolor, colors, "error"))
+            print(color(nocolor, colors, "error") + "({ec})".format(ec=ec), end="")
+            print(" ", end="")
+            print(color(nocolor, colors, "path") + pheader, end="")
+            print(" ", end="")
+            print(color(nocolor, colors, "command") + cheader)
+            print(color(nocolor, colors, "error") + out)
             continue
         pass
     return nerrors
@@ -384,5 +378,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = main()
-    if rv >= 245: print("Errors exceed 245", file=sys.stderr)
+    if rv >= 246: print("Errors exceed 246", file=sys.stderr)
     sys.exit(rv)

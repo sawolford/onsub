@@ -1,62 +1,21 @@
-arguments = [
-    # "--count", "10",
-    # "--debug",
-    # "--disable", "all",
-    # "--enable", "all",
-    # "--file", "subs.py",
-    # "--ignore", ".hg", "--ignore", ".git", "--ignore", ".svn",
-    # "--nocolor",
-    # "--noenable",
-    # "--noexec",
-    # "--nofile",
-    # "--noignore",
-    # "--noop",
-    # "--py:closebrace", "%]",
-    # "--py:enable", "py:enable",
-    # "--py:makecommand", "py:makecommand",
-    # "--py:makefunction", "py:makefunction",
-    # "--py:openbrace", "%[",
-    # "--py:priority", "py:priority",
-    # "--sleepmake", ".1",
-    # "--sleepcommand", "0",
-    # "--suppress",
-    # "--verbose", "5",
-    # "--workers", "8",
-]
+import os
+from colorama import Fore, Back, Style
 
 colors = {
-#     "path": "blue",
-#     "command": "cyan",
-#     "good": "green",
-#     "bad": "magenta",
-#     "error": "red",
-#     "partition": "yellow",
+    "path": Fore.BLUE + Back.RESET + Style.BRIGHT,
+    "command": Fore.CYAN + Back.RESET + Style.BRIGHT,
+    "good": Fore.GREEN + Back.RESET + Style.BRIGHT,
+    "bad": Fore.MAGENTA + Back.RESET + Style.BRIGHT,
+    "error": Fore.RED + Back.RESET + Style.BRIGHT,
+    "partition": Fore.YELLOW + Back.RESET + Style.BRIGHT,
 }
 
-def fileCheck(verbose, debug, path, noexec, *args):
-    if len(args) != 1: return 1, "fileCheck: wrong number of arguments"
-    fname = args[0]
-    if verbose >= 4: print("os.path.exists({fname})".format(fname=fname))
-    if noexec: return 0, "[noexec] py:fileCheck"
-    exists = os.path.exists(fname)
-    fpath = "{path}/{fname}".format(path=path, fname=fname)
-    if exists: return 0, "{fpath} exists".format(fpath=fpath)
-    return 1, "{fpath} does not exist".format(fpath=fpath)
-
-defdefault = {
-    "py:fileCheck": fileCheck,
-    "cwd": f"{os.getcwd()}",
-}
-
+defdefault = { "cwd": f"{os.getcwd()}", }
 deflinux = {
     "sep": ";",
     "echo": "/bin/echo",
-    "lswcl": "ls | wc -l",
 }
-
-defwindows = {
-    "sep": "&",
-}
+defwindows = { "sep": "&", }
 
 default = {}
 default.update(defdefault)
@@ -102,18 +61,12 @@ def hgmakecommand(verbose, debug, path, *rest):
     if debug: print(cmd)
     return cmd
 
-def hgwrite(verbose, debug, path, noexec, *rest):
-    cmd = " ".join(["hg ci"] + list(rest))
-    if noexec: return 0, "[noexec] {cmd}".format(cmd=cmd)
-    return mycheck_call(cmd)
-
 def hgpriority(verbose, debug, path): return 3 if os.path.exists(".hg") else 0
 
 hgdefault =  {
     "py:priority": hgpriority,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
-    "py:write": hgwrite,
     "write": "{cmd} ci",
     "get": "{cmd} pull --update",
     "put": "{cmd} push",
@@ -189,6 +142,3 @@ all.update(default)
 all.update(alldefault)
 if os.name == "nt": all.update(allwindows)
 else: all.update(alllinux)
-
-localpy = f"{HOME()}/.onsub,local.py"
-if os.path.exists(localpy): exec(open(localpy).read(), globals(), locals())
