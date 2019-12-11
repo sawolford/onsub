@@ -8,7 +8,7 @@ from colorama import Fore, Back, Style
 import pebble as pb
 import runpy as rp
 import pushd as pd
-import onsubdefaults as od
+import config.onsubbuiltin as od
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -81,14 +81,15 @@ class pyfuncfuture:
     pass
 
 def HOME():
-    if os.name != "nt": return os.environ["HOME"]
-    homedrive = os.environ["HOMEDRIVE"]
-    homepath = os.environ["HOMEPATH"]
-    return "{homedrive}/{homepath}".format(homedrive=homedrive, homepath=homepath)
+    if "HOME" in os.environ: return os.environ["HOME"]
+    if "USERPROFILE" in os.environ: return os.environ["USERPROFILE"]
+    if "HOMEDRIVE" in os.environ and "HOMEPATH" in os.environ: return "{}/{}".format(homedrive, homepath)
+    return "NO HOME"
 
 def readConfig(configfile, configs=[]):
     rc = od.__dict__.copy()
-    if os.path.exists(configfile): rc.update(rp.run_path(configfile, globals()))
+    rc["HOME"] = HOME
+    if type(configfile) == type("") and os.path.exists(configfile): rc.update(rp.run_path(configfile, rc))
     for config in configs:
         exec(config, globals(), rc)
         continue
@@ -190,7 +191,11 @@ def main():
     try: onsub = os.environ["ONSUB"].split()
     except KeyError: onsub = []
     cmdargs = parser.parse_args(onsub + sys.argv[1:])
-    configfile = getValue(cmdargs.configfile, None, f'{HOME()}/.onsub.py')
+    homepy = f'{HOME()}/.onsub.py'
+    if getattr(sys, "frozen", False): cmdname = sys.executable
+    else: cmdname = __file__
+    exepy = "{dir}/config/onsubdefaults.py".format(dir=os.path.realpath(os.path.dirname(cmdname)))
+    configfile = getValue(cmdargs.configfile, None, homepy if os.path.exists(homepy) else (exepy if os.path.exists(exepy) else None))
     rc = readConfig(configfile)
     rcarguments = rc["arguments"] if "arguments" in rc else []
     fileargs = parser.parse_args(rcarguments)
@@ -261,7 +266,7 @@ def main():
     priorities = {}
     dumpFound = False
     for section, vv in rc.items():
-        if section == "colors": continue
+        if section == "colors" or section == "__builtins__": continue
         if type(rc[section]) != type({}): continue
         if dumpall or section in dumps:
             dumpFound = True
@@ -353,7 +358,10 @@ def main():
             if verbose >= 6: display(verbose, nocolor, colors, pheader, cheader, ec, out)
             pass
         else:
-            cmd = format(" ".join(rest), default, pyopenbrace, pyclosebrace, count)
+            command = rest[0]
+            if command[0] == "\\": command = command[1:]
+            elif command in default: command = "{{{command}}}".format(command=command)
+            cmd = format(" ".join([command] + rest[1:]), default, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
             pass
         futures.append(future)
