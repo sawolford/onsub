@@ -86,22 +86,14 @@ def HOME():
     if "HOMEDRIVE" in os.environ and "HOMEPATH" in os.environ: return "{}/{}".format(homedrive, homepath)
     return "NO HOME"
 
-def readConfig(configfile, configs=[]):
-    rc = od.__dict__.copy()
-    rc["HOME"] = HOME
-    if type(configfile) == type("") and os.path.exists(configfile): rc.update(rp.run_path(configfile, rc))
-    for config in configs:
-        exec(config, globals(), rc)
-        continue
-    return rc
-
 def display(verbose, nocolor, colors, pheader, cheader, ec, out):
+    out = out.strip()
     if verbose >= 3:
         print(color(nocolor, colors, "path") + pheader, end="")
         print(" ", end="")
         print(color(nocolor, colors, "command") + cheader)
         pass
-    if verbose >= 2:
+    if verbose >= 2 and len(out):
         if ec: print(color(nocolor, colors, "bad") + out)
         else: print(color(nocolor, colors, "good") + out)
         pass
@@ -182,6 +174,17 @@ def dispResults(verbose, debug, nocolor, colors, partition, results):
             continue
         pass
     return nerrors
+
+def readConfig(configfile, configs=[]):
+    rc = od.__dict__.copy()
+    rc["HOME"] = HOME
+    rc["mycheck_call"] = mycheck_call
+    rc["mycheck_output"] = mycheck_output
+    if type(configfile) == type("") and os.path.exists(configfile): rc.update(rp.run_path(configfile, rc))
+    for config in configs:
+        exec(config, globals(), rc)
+        continue
+    return rc
 
 def main():
     global futures
@@ -330,7 +333,7 @@ def main():
     for path, fsection, _ in cmdIterate(ignores):
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
-        
+        if len(path) > 2 and (path[0:2] == "./" or path[0:2] == ".\\"): path = path[2:]
         if fsection: section = fsection
         else:
             maxsection = (0, "")
@@ -378,7 +381,7 @@ def main():
             print(color(nocolor, colors, "path") + pheader, end="")
             print(" ", end="")
             print(color(nocolor, colors, "command") + cheader)
-            print(color(nocolor, colors, "error") + out)
+            if len(out): print(color(nocolor, colors, "error") + out)
             continue
         pass
     return nerrors
