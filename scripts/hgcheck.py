@@ -34,10 +34,10 @@ def hgcheck(verbose, debug, path, noexec, *rest):
     if nin > 0 and nout > 0: return 6, 'onsub --chdir {path} --workers 1 --depth 1 {{mix}}'.format(path=path)
     return 0, "[no local mods, no repository changes]"
 
-def myhgcheck(*args): return hgcheck(5, False, os.getcwd(), False, *args)
+def myhgcheck(args): return hgcheck(5, False, os.getcwd(), False, *args)
 
 if __name__ == "__main__":
-    ec, out = myhgcheck(sys.argv)
+    ec, out = myhgcheck(sys.argv[1:])
     print(out)
     sys.exit(ec)
     pass
