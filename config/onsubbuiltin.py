@@ -23,9 +23,10 @@ if os.name =="nt": default.update(defwindows)
 else: default.update(deflinux)
 
 def gitmakecommand(verbose, debug, path, *rest):
+    if os.path.exists(path): return None
     assert len(rest) >= 1
     url = rest[0]
-    cmd = "git clone {url} {path}".format(url=url, path=path)
+    cmd = "{{cmd}} clone {url} {path}".format(url=url, path=path)
     if debug: print(cmd)
     return cmd
 
@@ -38,8 +39,8 @@ gitdefault = {
     "write": "{cmd} ci -a",
     "get": "{cmd} pull",
     "put": "{cmd} push",
-    "remote": "{cmd} remote -v",
-    "allremote": "{remote}",
+    "remote": "{cmd} remote get-url origin",
+    "allremote": "{cmd} remote -v",
 }
 
 gitlinux = {}
@@ -53,11 +54,12 @@ else: git.update(gitlinux)
 git["py:enable"] = True
 
 def hgmakecommand(verbose, debug, path, *rest):
+    if os.path.exists(path): return None
     assert len(rest) >= 1
     rrev = ""
     if len(rest) >= 2: rrev = "-r {rev}".format(rev=rest[1])
     url = rest[0]
-    cmd = "hg clone {url} {path} {rrev}".format(url=url, path=path, rrev=rrev)
+    cmd = "{{cmd}} clone {url} {path} {rrev}".format(url=url, path=path, rrev=rrev)
     if debug: print(cmd)
     return cmd
 
@@ -73,8 +75,8 @@ hgdefault =  {
 }
 
 hglinux = {
-    "remote": '{echo} -n "default = "; {cmd} paths default',
-    "allremote": '{remote}; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
+    "remote": '{cmd} paths default',
+    "allremote": '{echo} -n "default = "; {cmd} paths default; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
 }
 
 hgwindows = {
@@ -90,11 +92,12 @@ else: hg.update(hglinux)
 hg["py:enable"] = True
 
 def svnmakecommand(verbose, debug, path, *rest):
+    if os.path.exists(path): return None
     assert len(rest) >= 1
     rev = "head"
     if len(rest) >= 2: rev = rest[1]
     url = rest[0]
-    cmd = "svn checkout {url}@{rev} {path}".format(url=url, path=path, rev=rev)
+    cmd = "{{cmd}} checkout {url}@{rev} {path}".format(url=url, path=path, rev=rev)
     if debug: print(cmd)
     return cmd
 
@@ -122,6 +125,7 @@ else: svn.update(svnlinux)
 svn["py:enable"] = True
 
 def allmakefunction(verbose, debug, path, noexec, *rest):
+    if os.path.exists(path): return 0, 'path "{path}" already exists'.format(path=path)
     if verbose >=4: print("os.makedirs({path})".format(path=path))
     if noexec: return 0, "[noexec] os.makedirs({path})".format(path=path)
     os.makedirs(path)

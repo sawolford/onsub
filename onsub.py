@@ -19,7 +19,7 @@ def error(code, *args, **kwargs):
     sys.exit(code)
     return
 
-def format(st, rc, openbrace, closebrace, count):
+def substitute(st, rc, openbrace, closebrace, count):
     while count >= 0:
         try: nst = st.format(**rc)
         except ValueError as exc: error(256 - 8, "Invalid substitution string: {exc}".format(exc=exc))
@@ -115,12 +115,13 @@ def genParser():
     parser.add_argument("--file", help="file with folder names", action="append")
     parser.add_argument("--ignore", help="ignore folder names", action="append")
     parser.add_argument("--invert", help="invert error codes", action="store_true")
+    parser.add_argument("--make", help="make folders", action="store_true")
     parser.add_argument("--nocolor", help="disables colorized output", action="store_true")
     parser.add_argument("--noenable", help="no longer enable any sections", action="store_true")
     parser.add_argument("--noexec", help="do not actually execute", action="store_true")
     parser.add_argument("--nofile", help="ignore file options", action="store_true")
     parser.add_argument("--noignore", help="ignore ignore options", action="store_true")
-    parser.add_argument("--noop", help="no command execution", action="store_true")
+    parser.add_argument("--nomake", help="do not make folders", action="store_true")
     parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str)
     parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str)
     parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str)
@@ -219,7 +220,8 @@ def main():
     files = (cmdargs.file or []) + (fileargs.file or []) if not nofile else []
     noignore = getValue(cmdargs.noignore, fileargs.noignore, False)
     ignores = (cmdargs.ignore or []) + (fileargs.ignore or []) if not noignore else []
-    noop = getValue(cmdargs.noop, fileargs.noop, False)
+    nomake = getValue(cmdargs.nomake, fileargs.nomake, False)
+    make = getValue(cmdargs.make, fileargs.make, False) if not nomake else False
     pyclosebrace = getValue(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
     pyenable = getValue(cmdargs.pyenable, fileargs.pyenable, "py:enable")
     pymakecommand = getValue(cmdargs.pymakecommand, fileargs.pymakecommand, "py:makecommand")
@@ -232,12 +234,12 @@ def main():
     verbose = getValue(cmdargs.verbose, fileargs.verbose, 4)
     workers = getValue(cmdargs.workers, fileargs.workers, mp.cpu_count())
     rest = cmdargs.rest
-    if not noop and not dumpall and len(dumps) == 0 and len(rest) < 1: error(256 - 1, "Not enough command arguments")
+    noop = True if not dumpall and len(dumps) == 0 and len(rest) < 1 else False
     if chdir: os.chdir(chdir)
 
     paths = {}
     for file in files:
-        if not os.path.exists(file): error(256 - 2, 'Input file {file} does not exist'.format(file=file))
+        if not os.path.exists(file): error(256 - 1, 'Input file {file} does not exist'.format(file=file))
         rc = readConfig(file, configs)
         for section in rc:
             if section in ["python_path", "futures"]: continue
@@ -287,39 +289,40 @@ def main():
         except KeyError: defenable = False
         if ((noenable or not defenable) and not enable) or disable: continue
         try: priority = default[pypriority]
-        except KeyError: error(256 - 3, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
+        except KeyError: error(256 - 2, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
         priorities[section] = priority
         continue
     if len(dumps) > 0:
-        if not dumpFound: error(256 - 4, "No matching sections found")
+        if not dumpFound: error(256 - 3, "No matching sections found")
         return 0
 
     pool = pb.ProcessPool(max_workers=workers)
     signal.signal(signal.SIGINT, sighandler)
 
     for path, section, entry in fileIterate(ignores):
+        if not make: continue
         if not entry: entry = tuple()
-        if not os.path.exists(path):
-            if section not in priorities: error(256 - 5, "No section applies to {section} = {path}".format(section=section, path=path))
-            rc = readConfig(configfile, configs)
-            default = rc[section]
-            makefunction = makecommand = None
-            try: makecommand = default[pymakecommand]
-            except KeyError:
-                try: makefunction = default[pymakefunction]
-                except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
-                pass
-            time.sleep(sleepmake)
-            if makecommand:
-                cmd = makecommand(verbose, debug, path, *entry)
-                future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
-                pass
-            else:
-                ec, out = makefunction(verbose, debug, path, noexec, *entry)
-                future = pyfuncfuture(path, makefunction.__name__, ec, out)
-                pass
-            futures.append(future)
+        if section not in priorities: error(256 - 4, "No section applies to {section} = {path}".format(section=section, path=path))
+        rc = readConfig(configfile, configs)
+        default = rc[section]
+        makefunction = makecommand = None
+        try: makecommand = default[pymakecommand]
+        except KeyError:
+            try: makefunction = default[pymakefunction]
+            except: error(256 - 5, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
             pass
+        time.sleep(sleepmake)
+        if makecommand:
+            cmd = makecommand(verbose, debug, path, *entry)
+            if not cmd: continue
+            cmd = substitute(cmd, default, pyopenbrace, pyclosebrace, count)
+            future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
+            pass
+        else:
+            ec, out = makefunction(verbose, debug, path, noexec, *entry)
+            future = pyfuncfuture(path, makefunction.__name__, ec, out)
+            pass
+        futures.append(future)
         continue
     results = waitFutures(verbose, debug, nocolor, colors, invert, futures)
     nerrors = dispResults(verbose, debug, nocolor, colors, "<<< MAKE >>>", results)
@@ -331,6 +334,7 @@ def main():
     if len(files) > 0: cmdIterate = fileIterate
     else: cmdIterate = pathIterate
     for path, fsection, _ in cmdIterate(ignores):
+        if not os.path.isdir(path): error(256 - 6, 'Folder "{path}" does not exist.'.format(path=path))
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         if len(path) > 2 and (path[0:2] == "./" or path[0:2] == ".\\"): path = path[2:]
@@ -364,7 +368,7 @@ def main():
             command = rest[0]
             if command[0] == "\\": command = command[1:]
             elif command in default: command = "{{{command}}}".format(command=command)
-            cmd = format(" ".join([command] + rest[1:]), default, pyopenbrace, pyclosebrace, count)
+            cmd = substitute(" ".join([command] + rest[1:]), default, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
             pass
         futures.append(future)
