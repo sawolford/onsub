@@ -10,7 +10,7 @@ colors = {
     "partition": Fore.YELLOW + Back.RESET + Style.BRIGHT,
 }
 
-defdefault = { "cwd": f"{os.getcwd()}", }
+defdefault = {}
 deflinux = {
     "sep": ";",
     "echo": "/bin/echo",
@@ -36,9 +36,6 @@ gitdefault = {
     "py:priority": gitpriority, 
     "py:makecommand": gitmakecommand,
     "cmd": "git",
-    "write": "{cmd} ci -a",
-    "get": "{cmd} pull",
-    "put": "{cmd} push",
     "remote": "{cmd} remote get-url origin",
     "allremote": "{cmd} remote -v",
 }
@@ -69,9 +66,6 @@ hgdefault =  {
     "py:priority": hgpriority,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
-    "write": "{cmd} ci",
-    "get": "{cmd} pull --update",
-    "put": "{cmd} push",
 }
 
 hglinux = {
@@ -107,9 +101,6 @@ svndefault = {
     "py:priority": svnpriority,
     "py:makecommand": svnmakecommand,
     "cmd": "svn",
-    "write": "{cmd} [noop]",
-    "get": "{cmd} up",
-    "put": "{cmd} ci",
     "remote": "{cmd} info --show-item url",
     "allremote": "{remote}",
 }

@@ -7,6 +7,7 @@ import colorama as ca
 from colorama import Fore, Back, Style
 import pebble as pb
 import runpy as rp
+import hashlib as hl
 import pushd as pd
 import config.onsubbuiltin as od
 
@@ -22,8 +23,8 @@ def error(code, *args, **kwargs):
 def substitute(st, rc, openbrace, closebrace, count):
     while count >= 0:
         try: nst = st.format(**rc)
-        except ValueError as exc: error(256 - 8, "Invalid substitution string: {exc}".format(exc=exc))
-        except KeyError as exc: error(256 - 9, "Substitution not found: {exc}".format(exc=exc))
+        except ValueError as exc: error(256 - 9, "Invalid substitution string: {exc}".format(exc=exc))
+        except KeyError as exc: error(256 - 10, "Substitution not found: {exc}".format(exc=exc))
         if nst == st: break
         st = nst
         count -= 1
@@ -62,8 +63,8 @@ def cdwork(path, cmd, section, verbose, debug, noexec, cd):
     with pd.pushd(cd): rv = work(path, cmd, section, verbose, debug, noexec)
     return rv
 
-def color(nocolor, colors, color):
-    if nocolor: return ""
+def tocolor(fcolor, colors, color):
+    if not fcolor: return ""
     try: return colors[color]
     except KeyError: pass
     return od.colors[color]
@@ -86,16 +87,16 @@ def HOME():
     if "HOMEDRIVE" in os.environ and "HOMEPATH" in os.environ: return "{}/{}".format(homedrive, homepath)
     return "NO HOME"
 
-def display(verbose, nocolor, colors, pheader, cheader, ec, out):
+def display(verbose, color, colors, pheader, cheader, ec, out):
     out = out.strip()
     if verbose >= 3:
-        print(color(nocolor, colors, "path") + pheader, end="")
+        print(tocolor(color, colors, "path") + pheader, end="")
         print(" ", end="")
-        print(color(nocolor, colors, "command") + cheader)
+        print(tocolor(color, colors, "command") + cheader)
         pass
     if verbose >= 2 and len(out):
-        if ec: print(color(nocolor, colors, "bad") + out)
-        else: print(color(nocolor, colors, "good") + out)
+        if ec: print(tocolor(color, colors, "bad") + out)
+        else: print(tocolor(color, colors, "good") + out)
         pass
     return
 
@@ -103,25 +104,29 @@ def genParser():
     fc = lambda prog: ap.RawDescriptionHelpFormatter(prog, max_help_position=36, width=120)
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
     parser.add_argument("--chdir", help="chdir first", type=str)
+    parser.add_argument("--color", help="enables colorized output", action="store_true", default=None)
+    parser.add_argument("--comment", help="ignored", type=str)
     parser.add_argument("--config", help="config option", action="append")
     parser.add_argument("--configfile", help="config file", type=str)
     parser.add_argument("--count", help="count for substitutions", type=int)
-    parser.add_argument("--debug", help="debug flag", action="store_true")
+    parser.add_argument("--debug", help="debug flag", action="store_true", default=None)
     parser.add_argument("--depth", help="walk depth", type=int)
     parser.add_argument("--disable", help="disable section", action="append")
     parser.add_argument("--dump", help="dump section", action="append")
-    parser.add_argument("--dumpall", help="dump all sections", action="store_true")
+    parser.add_argument("--dumpall", help="dump all sections", action="store_true", default=None)
     parser.add_argument("--enable", help="enable section", action="append")
     parser.add_argument("--file", help="file with folder names", action="append")
+    parser.add_argument("--hashed", help="check hashes of unknown files", action="store_true", default=None)
     parser.add_argument("--ignore", help="ignore folder names", action="append")
-    parser.add_argument("--invert", help="invert error codes", action="store_true")
-    parser.add_argument("--make", help="make folders", action="store_true")
-    parser.add_argument("--nocolor", help="disables colorized output", action="store_true")
-    parser.add_argument("--noenable", help="no longer enable any sections", action="store_true")
-    parser.add_argument("--noexec", help="do not actually execute", action="store_true")
-    parser.add_argument("--nofile", help="ignore file options", action="store_true")
-    parser.add_argument("--noignore", help="ignore ignore options", action="store_true")
-    parser.add_argument("--nomake", help="do not make folders", action="store_true")
+    parser.add_argument("--invert", help="invert error codes", action="store_true", default=None)
+    parser.add_argument("--make", help="make folders", action="store_true", default=None)
+    parser.add_argument("--nocolor", help="disables colorized output", action="store_true", default=None)
+    parser.add_argument("--noenable", help="no longer enable any sections", action="store_true", default=None)
+    parser.add_argument("--noexec", help="do not actually execute", action="store_true", default=None)
+    parser.add_argument("--nofile", help="ignore file options", action="store_true", default=None)
+    parser.add_argument("--nohashed", help="do not check hashes of unknown files", action="store_true", default=None)
+    parser.add_argument("--noignore", help="ignore ignore options", action="store_true", default=None)
+    parser.add_argument("--nomake", help="do not make folders", action="store_true", default=None)
     parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str)
     parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str)
     parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str)
@@ -130,16 +135,19 @@ def genParser():
     parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str)
     parser.add_argument("--sleepmake", help="sleep between make calls", type=float)
     parser.add_argument("--sleepcommand", help="sleep between command calls", type=float)
-    parser.add_argument("--suppress", help="suppress repeated error output", action="store_true")
+    parser.add_argument("--suppress", help="suppress repeated error output", action="store_true", default=None)
     parser.add_argument("--verbose", help="verbose level", type=int)
     parser.add_argument("--workers", help="number of workers", type=int)
     parser.add_argument("rest", nargs=ap.REMAINDER)
     return parser
 
-def getValue(cmdarg, filearg, default):
-    if cmdarg: return cmdarg
-    if filearg: return filearg
-    return default
+def getValue(*args):
+    for arg in args:
+        if arg is not None: return arg
+        continue
+    return None
+
+def mynot(arg): return True if arg == False else (False if arg == True else None)
 
 futures = []
 def sighandler(signum, frame):
@@ -148,14 +156,14 @@ def sighandler(signum, frame):
     sys.exit()
     return
 
-def waitFutures(verbose, debug, nocolor, colors, invert, futures):
+def waitFutures(verbose, debug, color, colors, invert, futures):
     results = []
     while True:
         nfutures = []
         for future in futures:
             if future.done():
                 pheader, cheader, ec, out = future.result()
-                if verbose >= 5: display(verbose, nocolor, colors, pheader, cheader, ec, out)
+                if verbose >= 5: display(verbose, color, colors, pheader, cheader, ec, out)
                 results.append((pheader, cheader, ec if not invert else not ec, out))
                 pass
             else: nfutures.append(future)
@@ -165,13 +173,13 @@ def waitFutures(verbose, debug, nocolor, colors, invert, futures):
         continue
     return results
 
-def dispResults(verbose, debug, nocolor, colors, partition, results):
+def dispResults(verbose, debug, color, colors, partition, results):
     nerrors = 0
     if len(results):
-        if verbose >= 2: print(color(nocolor, colors, "partition") + partition)
+        if verbose >= 2: print(tocolor(color, colors, "partition") + partition)
         for pheader, cheader, ec, out in results:
             if ec: nerrors += 1
-            display(verbose, nocolor, colors, pheader, cheader, ec, out)
+            display(verbose, color, colors, pheader, cheader, ec, out)
             continue
         pass
     return nerrors
@@ -202,26 +210,27 @@ def main():
     configfile = getValue(cmdargs.configfile, None, homepy if os.path.exists(homepy) else (exepy if os.path.exists(exepy) else None))
     rc = readConfig(configfile)
     rcarguments = rc["arguments"] if "arguments" in rc else []
+    rchashes = rc["hashes"] if "hashes" in rc else []
     fileargs = parser.parse_args(rcarguments)
-    chdir = getValue(cmdargs.chdir, None, None)
-    configs = getValue(cmdargs.config, None, [])
+    chdir = getValue(cmdargs.chdir)
+    color = getValue(cmdargs.color, mynot(cmdargs.nocolor), fileargs.color, mynot(fileargs.nocolor), True)
+    configs = getValue(cmdargs.config, [])
     count = getValue(cmdargs.count, fileargs.count, 10)
     debug = getValue(cmdargs.debug, fileargs.debug, False)
-    depth = getValue(cmdargs.depth, None, -1)
+    depth = getValue(cmdargs.depth, -1)
     disables = (cmdargs.disable or []) + (fileargs.disable or [])
     dumps = cmdargs.dump or []
-    dumpall = getValue(cmdargs.dumpall, None, False)
+    dumpall = getValue(cmdargs.dumpall, False)
     enables = (cmdargs.enable or []) + (fileargs.enable or [])
-    invert = getValue(cmdargs.invert, None, False)
-    nocolor = getValue(cmdargs.nocolor, fileargs.nocolor, False)
+    hashed = getValue(cmdargs.hashed, mynot(cmdargs.nohashed), fileargs.hashed, mynot(fileargs.nohashed), True)
+    invert = getValue(cmdargs.invert, False)
     noenable = getValue(cmdargs.noenable, fileargs.noenable, False)
     noexec = getValue(cmdargs.noexec, fileargs.noexec, False)
     nofile = getValue(cmdargs.nofile, fileargs.nofile, False)
     files = (cmdargs.file or []) + (fileargs.file or []) if not nofile else []
     noignore = getValue(cmdargs.noignore, fileargs.noignore, False)
     ignores = (cmdargs.ignore or []) + (fileargs.ignore or []) if not noignore else []
-    nomake = getValue(cmdargs.nomake, fileargs.nomake, False)
-    make = getValue(cmdargs.make, fileargs.make, False) if not nomake else False
+    make = getValue(cmdargs.make, mynot(cmdargs.nomake), fileargs.make, mynot(fileargs.nomake), False)
     pyclosebrace = getValue(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
     pyenable = getValue(cmdargs.pyenable, fileargs.pyenable, "py:enable")
     pymakecommand = getValue(cmdargs.pymakecommand, fileargs.pymakecommand, "py:makecommand")
@@ -239,7 +248,9 @@ def main():
 
     paths = {}
     for file in files:
-        if not os.path.exists(file): error(256 - 1, 'Input file {file} does not exist'.format(file=file))
+        if not os.path.exists(file): error(256 - 1, 'Input file "{file}" does not exist'.format(file=file))
+        hd = hl.sha256(open(file).read().encode()).hexdigest()
+        if hashed and hd not in rchashes: error(256 - 2, 'Input file "{file}" does not have allowed hash ({hd})'.format(file=file, hd=hd))
         rc = readConfig(file, configs)
         for section in rc:
             if section in ["python_path", "futures"]: continue
@@ -289,11 +300,11 @@ def main():
         except KeyError: defenable = False
         if ((noenable or not defenable) and not enable) or disable: continue
         try: priority = default[pypriority]
-        except KeyError: error(256 - 2, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
+        except KeyError: error(256 - 3, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
         priorities[section] = priority
         continue
     if len(dumps) > 0:
-        if not dumpFound: error(256 - 3, "No matching sections found")
+        if not dumpFound: error(256 - 4, "No matching sections found")
         return 0
 
     pool = pb.ProcessPool(max_workers=workers)
@@ -302,14 +313,13 @@ def main():
     for path, section, entry in fileIterate(ignores):
         if not make: continue
         if not entry: entry = tuple()
-        if section not in priorities: error(256 - 4, "No section applies to {section} = {path}".format(section=section, path=path))
-        rc = readConfig(configfile, configs)
+        if section not in priorities: error(256 - 5, "No section applies to {section} = {path}".format(section=section, path=path))
         default = rc[section]
         makefunction = makecommand = None
         try: makecommand = default[pymakecommand]
         except KeyError:
             try: makefunction = default[pymakefunction]
-            except: error(256 - 5, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
+            except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
             pass
         time.sleep(sleepmake)
         if makecommand:
@@ -324,8 +334,8 @@ def main():
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, debug, nocolor, colors, invert, futures)
-    nerrors = dispResults(verbose, debug, nocolor, colors, "<<< MAKE >>>", results)
+    results = waitFutures(verbose, debug, color, colors, invert, futures)
+    nerrors = dispResults(verbose, debug, color, colors, "<<< MAKE >>>", results)
     if noop: return nerrors
 
     root = os.getcwd()
@@ -334,7 +344,7 @@ def main():
     if len(files) > 0: cmdIterate = fileIterate
     else: cmdIterate = pathIterate
     for path, fsection, _ in cmdIterate(ignores):
-        if not os.path.isdir(path): error(256 - 6, 'Folder "{path}" does not exist.'.format(path=path))
+        if not os.path.isdir(path): error(256 - 7, 'Folder "{path}" does not exist.'.format(path=path))
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         if len(path) > 2 and (path[0:2] == "./" or path[0:2] == ".\\"): path = path[2:]
@@ -350,7 +360,6 @@ def main():
             if maxsection[0] == 0: continue
             section = maxsection[1]
             pass
-        with pd.pushd(path): rc = readConfig(configfile, configs)
         default = rc[section]
         time.sleep(sleepcommand)
         if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
@@ -359,10 +368,10 @@ def main():
             pheader = "{path} ({section})".format(path=path, section=section)
             cheader = "{cmd}".format(cmd=cmd)
             try: pyfunc = default[cmd]
-            except KeyError: error(256 - 7, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
+            except KeyError: error(256 - 8, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
             with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
-            if verbose >= 6: display(verbose, nocolor, colors, pheader, cheader, ec, out)
+            if verbose >= 6: display(verbose, color, colors, pheader, cheader, ec, out)
             pass
         else:
             command = rest[0]
@@ -373,19 +382,19 @@ def main():
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, debug, nocolor, colors, invert, futures)
+    results = waitFutures(verbose, debug, color, colors, invert, futures)
 
-    nerrors = dispResults(verbose, debug, nocolor, colors, "<<< RESULTS >>>", results)
+    nerrors = dispResults(verbose, debug, color, colors, "<<< RESULTS >>>", results)
     if not suppress and verbose >= 1 and nerrors > 0:
-        print(color(nocolor, colors, "partition") + "<<< ERRORS >>>")
+        print(tocolor(color, colors, "partition") + "<<< ERRORS >>>")
         for pheader, cheader, ec, out in results:
             if not ec: continue
-            print(color(nocolor, colors, "error") + "({ec})".format(ec=ec), end="")
+            print(tocolor(color, colors, "error") + "({ec})".format(ec=ec), end="")
             print(" ", end="")
-            print(color(nocolor, colors, "path") + pheader, end="")
+            print(tocolor(color, colors, "path") + pheader, end="")
             print(" ", end="")
-            print(color(nocolor, colors, "command") + cheader)
-            if len(out): print(color(nocolor, colors, "error") + out)
+            print(tocolor(color, colors, "command") + cheader)
+            if len(out): print(tocolor(color, colors, "error") + out)
             continue
         pass
     return nerrors
@@ -393,5 +402,5 @@ def main():
 if __name__ == "__main__":
     mp.freeze_support()
     rv = main()
-    if rv >= 246: print("Errors exceed 246", file=sys.stderr)
+    if rv >= 245: print("Errors exceed 245", file=sys.stderr)
     sys.exit(rv)
