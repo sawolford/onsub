@@ -67,7 +67,9 @@ def tocolor(fcolor, colors, color):
     if not fcolor: return ""
     try: return colors[color]
     except KeyError: pass
-    return od.colors[color]
+    try: od.colors[color]
+    except KeyError: pass
+    return ""
 
 class pyfuncfuture:
     def __init__(self, pheader, cheader, ec, out):
@@ -141,13 +143,13 @@ def genParser():
     parser.add_argument("rest", nargs=ap.REMAINDER)
     return parser
 
-def getValue(*args):
+def option(*args):
     for arg in args:
         if arg is not None: return arg
         continue
     return None
-
-def mynot(arg): return True if arg == False else (False if arg == True else None)
+def opt(flag, value): return value if flag else None
+def optnot(arg): return True if arg == False else (False if arg == True else None)
 
 futures = []
 def sighandler(signum, frame):
@@ -176,7 +178,7 @@ def waitFutures(verbose, debug, color, colors, invert, futures):
 def dispResults(verbose, debug, color, colors, partition, results):
     nerrors = 0
     if len(results):
-        if verbose >= 2: print(tocolor(color, colors, "partition") + partition)
+        if verbose >= 3: print(tocolor(color, colors, "partition") + partition)
         for pheader, cheader, ec, out in results:
             if ec: nerrors += 1
             display(verbose, color, colors, pheader, cheader, ec, out)
@@ -195,6 +197,13 @@ def readConfig(configfile, configs=[]):
         continue
     return rc
 
+def rcPython(verbose, debug, path, rc):
+    rc = rc.copy()
+    for key, value in rc.items():
+        if len(key) > 2 and key[:3] != "py:" and callable(value): rc[key] = value(verbose, debug, path)
+        continue
+    return rc
+
 def main():
     global futures
     signal.signal(signalnum=signal.SIGINT, handler=signal.SIG_IGN)
@@ -207,41 +216,41 @@ def main():
     if getattr(sys, "frozen", False): cmdname = sys.executable
     else: cmdname = __file__
     exepy = "{dir}/config/onsubdefaults.py".format(dir=os.path.realpath(os.path.dirname(cmdname)))
-    configfile = getValue(cmdargs.configfile, None, homepy if os.path.exists(homepy) else (exepy if os.path.exists(exepy) else None))
+    configfile = option(cmdargs.configfile, homepy if os.path.exists(homepy) else (exepy if os.path.exists(exepy) else None))
     rc = readConfig(configfile)
     rcarguments = rc["arguments"] if "arguments" in rc else []
     rchashes = rc["hashes"] if "hashes" in rc else []
     fileargs = parser.parse_args(rcarguments)
-    chdir = getValue(cmdargs.chdir)
-    color = getValue(cmdargs.color, mynot(cmdargs.nocolor), fileargs.color, mynot(fileargs.nocolor), True)
-    configs = getValue(cmdargs.config, [])
-    count = getValue(cmdargs.count, fileargs.count, 10)
-    debug = getValue(cmdargs.debug, fileargs.debug, False)
-    depth = getValue(cmdargs.depth, -1)
+    chdir = option(cmdargs.chdir)
+    color = option(cmdargs.color, optnot(cmdargs.nocolor), fileargs.color, optnot(fileargs.nocolor), True)
+    configs = option(cmdargs.config, [])
+    count = option(cmdargs.count, fileargs.count, 10)
+    debug = option(cmdargs.debug, fileargs.debug, False)
+    depth = option(cmdargs.depth, -1)
     disables = (cmdargs.disable or []) + (fileargs.disable or [])
     dumps = cmdargs.dump or []
-    dumpall = getValue(cmdargs.dumpall, False)
+    dumpall = option(cmdargs.dumpall, False)
     enables = (cmdargs.enable or []) + (fileargs.enable or [])
-    hashed = getValue(cmdargs.hashed, mynot(cmdargs.nohashed), fileargs.hashed, mynot(fileargs.nohashed), True)
-    invert = getValue(cmdargs.invert, False)
-    noenable = getValue(cmdargs.noenable, fileargs.noenable, False)
-    noexec = getValue(cmdargs.noexec, fileargs.noexec, False)
-    nofile = getValue(cmdargs.nofile, fileargs.nofile, False)
+    hashed = option(cmdargs.hashed, optnot(cmdargs.nohashed), fileargs.hashed, optnot(fileargs.nohashed), True)
+    invert = option(cmdargs.invert, False)
+    noenable = option(cmdargs.noenable, fileargs.noenable, False)
+    noexec = option(cmdargs.noexec, fileargs.noexec, False)
+    nofile = option(cmdargs.nofile, fileargs.nofile, False)
     files = (cmdargs.file or []) + (fileargs.file or []) if not nofile else []
-    noignore = getValue(cmdargs.noignore, fileargs.noignore, False)
+    noignore = option(cmdargs.noignore, fileargs.noignore, False)
     ignores = (cmdargs.ignore or []) + (fileargs.ignore or []) if not noignore else []
-    make = getValue(cmdargs.make, mynot(cmdargs.nomake), fileargs.make, mynot(fileargs.nomake), False)
-    pyclosebrace = getValue(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
-    pyenable = getValue(cmdargs.pyenable, fileargs.pyenable, "py:enable")
-    pymakecommand = getValue(cmdargs.pymakecommand, fileargs.pymakecommand, "py:makecommand")
-    pymakefunction = getValue(cmdargs.pymakefunction, fileargs.pymakefunction, "py:makefunction")
-    pyopenbrace = getValue(cmdargs.pyopenbrace, fileargs.pyopenbrace, "%[")
-    pypriority = getValue(cmdargs.pypriority, fileargs.pypriority, "py:priority")
-    sleepmake = getValue(cmdargs.sleepmake, fileargs.sleepmake, 0.1)
-    sleepcommand = getValue(cmdargs.sleepcommand, fileargs.sleepcommand, 0)
-    suppress = getValue(cmdargs.suppress, fileargs.suppress, False)
-    verbose = getValue(cmdargs.verbose, fileargs.verbose, 4)
-    workers = getValue(cmdargs.workers, fileargs.workers, mp.cpu_count())
+    make = option(cmdargs.make, optnot(cmdargs.nomake), fileargs.make, optnot(fileargs.nomake), False)
+    pyclosebrace = option(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
+    pyenable = option(cmdargs.pyenable, fileargs.pyenable, "py:enable")
+    pymakecommand = option(cmdargs.pymakecommand, fileargs.pymakecommand, "py:makecommand")
+    pymakefunction = option(cmdargs.pymakefunction, fileargs.pymakefunction, "py:makefunction")
+    pyopenbrace = option(cmdargs.pyopenbrace, fileargs.pyopenbrace, "%[")
+    pypriority = option(cmdargs.pypriority, fileargs.pypriority, "py:priority")
+    sleepmake = option(cmdargs.sleepmake, fileargs.sleepmake, 0.1)
+    sleepcommand = option(cmdargs.sleepcommand, fileargs.sleepcommand, 0)
+    suppress = option(cmdargs.suppress, fileargs.suppress, False)
+    verbose = option(cmdargs.verbose, fileargs.verbose, 4)
+    workers = option(cmdargs.workers, fileargs.workers, mp.cpu_count())
     rest = cmdargs.rest
     noop = True if not dumpall and len(dumps) == 0 and len(rest) < 1 else False
     if chdir: os.chdir(chdir)
@@ -286,20 +295,20 @@ def main():
         if type(rc[section]) != type({}): continue
         if dumpall or section in dumps:
             dumpFound = True
-            default = rc[section]
+            rcsection = rc[section]
             print("{section} = {{".format(section=section))
-            for kk, vv in default.items():
+            for kk, vv in rcsection.items():
                 print("\t{kk} = {vv}".format(kk=kk, vv=vv))
                 continue
             print("}")
             continue
         enable = section in enables
         disable = section in disables
-        default = rc[section]
-        try: defenable = default[pyenable]
+        rcsection = rc[section]
+        try: defenable = rcsection[pyenable]
         except KeyError: defenable = False
         if ((noenable or not defenable) and not enable) or disable: continue
-        try: priority = default[pypriority]
+        try: priority = rcsection[pypriority]
         except KeyError: error(256 - 3, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
         priorities[section] = priority
         continue
@@ -314,18 +323,18 @@ def main():
         if not make: continue
         if not entry: entry = tuple()
         if section not in priorities: error(256 - 5, "No section applies to {section} = {path}".format(section=section, path=path))
-        default = rc[section]
+        rcsection = rcPython(verbose, debug, path, rc[section])
         makefunction = makecommand = None
-        try: makecommand = default[pymakecommand]
+        try: makecommand = rcsection[pymakecommand]
         except KeyError:
-            try: makefunction = default[pymakefunction]
+            try: makefunction = rcsection[pymakefunction]
             except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
             pass
         time.sleep(sleepmake)
         if makecommand:
             cmd = makecommand(verbose, debug, path, *entry)
             if not cmd: continue
-            cmd = substitute(cmd, default, pyopenbrace, pyclosebrace, count)
+            cmd = substitute(cmd, rcsection, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
             pass
         else:
@@ -360,14 +369,14 @@ def main():
             if maxsection[0] == 0: continue
             section = maxsection[1]
             pass
-        default = rc[section]
+        rcsection = rcPython(verbose, debug, path, rc[section])
         time.sleep(sleepcommand)
         if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
             cmd = rest[0]
             rem = rest[1:]
             pheader = "{path} ({section})".format(path=path, section=section)
             cheader = "{cmd}".format(cmd=cmd)
-            try: pyfunc = default[cmd]
+            try: pyfunc = rcsection[cmd]
             except KeyError: error(256 - 8, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
             with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
             future = pyfuncfuture(pheader, cheader, ec, out)
@@ -376,8 +385,8 @@ def main():
         else:
             command = rest[0]
             if command[0] == "\\": command = command[1:]
-            elif command in default: command = "{{{command}}}".format(command=command)
-            cmd = substitute(" ".join([command] + rest[1:]), default, pyopenbrace, pyclosebrace, count)
+            elif command in rcsection: command = "{{{command}}}".format(command=command)
+            cmd = substitute(" ".join([command] + rest[1:]), rcsection, pyopenbrace, pyclosebrace, count)
             future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
             pass
         futures.append(future)
@@ -389,12 +398,12 @@ def main():
         print(tocolor(color, colors, "partition") + "<<< ERRORS >>>")
         for pheader, cheader, ec, out in results:
             if not ec: continue
-            print(tocolor(color, colors, "error") + "({ec})".format(ec=ec), end="")
+            print(tocolor(color, colors, "errorcode") + "({ec})".format(ec=ec), end="")
             print(" ", end="")
             print(tocolor(color, colors, "path") + pheader, end="")
             print(" ", end="")
             print(tocolor(color, colors, "command") + cheader)
-            if len(out): print(tocolor(color, colors, "error") + out)
+            if len(out): print(tocolor(color, colors, "error") + out.strip())
             continue
         pass
     return nerrors

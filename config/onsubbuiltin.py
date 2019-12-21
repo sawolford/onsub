@@ -1,16 +1,24 @@
 import os
 from colorama import Fore, Back, Style
+import pushd as pd
 
 colors = {
     "path": Fore.BLUE + Back.RESET + Style.BRIGHT,
     "command": Fore.CYAN + Back.RESET + Style.BRIGHT,
-    "good": Fore.GREEN + Back.RESET + Style.BRIGHT,
-    "bad": Fore.MAGENTA + Back.RESET + Style.BRIGHT,
-    "error": Fore.RED + Back.RESET + Style.BRIGHT,
+    "errorcode": Fore.RED + Back.RESET + Style.BRIGHT,
     "partition": Fore.YELLOW + Back.RESET + Style.BRIGHT,
+    # "good": Fore.GREEN + Back.RESET + Style.BRIGHT,
+    # "bad": Fore.MAGENTA + Back.RESET + Style.BRIGHT,
+    # "error": Fore.RED + Back.RESET + Style.BRIGHT,
 }
 
-defdefault = {}
+def getcwd(path):
+    with pd.pushd(path): return os.getcwd()
+    return
+
+defdefault = {
+    "cwd": lambda v, d, path: getcwd(path),
+}
 deflinux = {
     "sep": ";",
     "echo": "/bin/echo",
@@ -33,13 +41,14 @@ def gitmakecommand(verbose, debug, path, *rest):
 def gitpriority(verbose, debug, path): return 4 if os.path.exists(".git") else 0
 
 gitdefault = {
+    "type": "echo '(git)' {cwd}",
+    "ctype": "echo " + Fore.GREEN + Back.RESET + Style.BRIGHT + "'(git)'" + Fore.RESET + " {cwd}",
     "py:priority": gitpriority, 
     "py:makecommand": gitmakecommand,
     "cmd": "git",
     "remote": "{cmd} remote get-url origin",
     "allremote": "{cmd} remote -v",
 }
-
 gitlinux = {}
 gitwindows = {}
 
@@ -63,16 +72,16 @@ def hgmakecommand(verbose, debug, path, *rest):
 def hgpriority(verbose, debug, path): return 3 if os.path.exists(".hg") else 0
 
 hgdefault =  {
+    "type": "echo '(hg)' {cwd}",
+    "ctype": "echo " + Fore.CYAN + Back.RESET + Style.BRIGHT + "'(hg)'" + Fore.RESET + " {cwd}",
     "py:priority": hgpriority,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
 }
-
 hglinux = {
     "remote": '{cmd} paths default',
     "allremote": '{echo} -n "default = "; {cmd} paths default; {echo} -n "default-push = "; {cmd} paths default-push; {echo} -n "default-pull = "; {cmd} paths default-pull',
 }
-
 hgwindows = {
     "remote": '{cmd} paths default',
     "allremote": '{remote}; {cmd} paths default-push; {cmd} paths default-pull',
@@ -98,13 +107,14 @@ def svnmakecommand(verbose, debug, path, *rest):
 def svnpriority(verbose, debug, path): return 2 if os.path.exists(".svn") else 0
 
 svndefault = {
+    "type": "echo '(svn)' {cwd}",
+    "ctype": "echo " + Fore.MAGENTA + Back.RESET + Style.BRIGHT + "'(svn)'" + Fore.RESET + " {cwd}",
     "py:priority": svnpriority,
     "py:makecommand": svnmakecommand,
     "cmd": "svn",
     "remote": "{cmd} info --show-item url",
     "allremote": "{remote}",
 }
-
 svnlinux = {}
 svnwindows = {}
 
@@ -125,10 +135,11 @@ def allmakefunction(verbose, debug, path, noexec, *rest):
 def allpriority(verbose, debug, path): return 1
 
 alldefault = {
+    "type": "echo '(all)' {cwd}",
+    "ctype": "{type}",
     "py:priority": allpriority,
     "py:makefunction": allmakefunction,
 }
-
 alllinux = {}
 allwindows = {}
 
