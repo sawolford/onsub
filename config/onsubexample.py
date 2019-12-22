@@ -105,7 +105,7 @@ def hgmakecommand(verbose, debug, path, *rest):
 def hgwrite(verbose, debug, path, noexec, *rest):
     cmd = " ".join(["hg ci"] + list(rest))
     if noexec: return 0, "[noexec] {cmd}".format(cmd=cmd)
-    return mycheck_call(cmd)
+    return check_call(cmd)
 
 def hgpriority(verbose, debug, path): return 3 if os.path.exists(".hg") else 0
 

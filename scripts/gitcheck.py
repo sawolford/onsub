@@ -2,7 +2,7 @@
 import os, sys
 import subprocess as sp
 
-def mycheck_output(cmd, stderr=sp.STDOUT):
+def check_output(cmd, stderr=sp.STDOUT):
     try:
         out = sp.check_output(cmd, shell=True, stderr=stderr).decode()
         ec = 0
@@ -14,7 +14,7 @@ def mycheck_output(cmd, stderr=sp.STDOUT):
     return ec, out
 
 def outcount(cmd):
-    ec, out = mycheck_output(cmd, stderr=sp.DEVNULL)
+    ec, out = check_output(cmd, stderr=sp.DEVNULL)
     return out.count("\n")
 
 def gitcheck(verbose, debug, path, noexec, *rest):

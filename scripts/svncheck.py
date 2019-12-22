@@ -2,7 +2,7 @@
 import os, sys
 import subprocess as sp
 
-def mycheck_output(cmd, stderr=sp.STDOUT):
+def check_output(cmd, stderr=sp.STDOUT):
     try:
         out = sp.check_output(cmd, shell=True, stderr=stderr).decode()
         ec = 0
@@ -14,8 +14,8 @@ def mycheck_output(cmd, stderr=sp.STDOUT):
     return ec, out
 
 def outcount():
-    cmd = "svn st"
-    ec, out = mycheck_output(cmd, stderr=sp.DEVNULL)
+    cmd = "svn st -q"
+    ec, out = check_output(cmd, stderr=sp.DEVNULL)
     out = out.splitlines()
     rv = 0
     for line in out:
@@ -25,7 +25,7 @@ def outcount():
 
 def outcountu():
     cmd = "svn status -u"
-    ec, out = mycheck_output(cmd, stderr=sp.DEVNULL)
+    ec, out = check_output(cmd, stderr=sp.DEVNULL)
     out = out.splitlines()
     rv = 0
     for line in out[:-1]:

@@ -31,12 +31,12 @@ def substitute(st, rc, openbrace, closebrace, count):
         continue
     return st.replace(openbrace, "{").replace(closebrace, "}")
 
-def mycheck_call(cmd):
+def check_call(cmd):
     try: ec = sp.check_call(cmd, shell=True)
     except sp.CalledProcessError as exc: ec = exc.returncode
     return ec, "{cmd}".format(cmd=cmd)
 
-def mycheck_output(cmd, stderr=sp.STDOUT):
+def check_output(cmd, stderr=sp.STDOUT):
     try:
         out = sp.check_output(cmd, shell=True, stderr=stderr).decode()
         ec = 0
@@ -52,7 +52,7 @@ def work(path, cmd, section, verbose, debug, noexec):
     cheader = "{cmd}".format(cmd=cmd)
     if verbose >= 4: print(pheader, cheader)
     if noexec: return pheader, cheader, 0, "[noexec] {cmd}".format(cmd=cmd)
-    ec, out = mycheck_output(cmd)
+    ec, out = check_output(cmd)
     if debug:
         print(pheader, cheader, "=", ec)
         print(out)
@@ -108,12 +108,12 @@ def genParser():
     parser.add_argument("--chdir", help="chdir first", type=str)
     parser.add_argument("--color", help="enables colorized output", action="store_true", default=None)
     parser.add_argument("--comment", help="ignored", type=str)
-    parser.add_argument("--config", help="config option", action="append")
     parser.add_argument("--configfile", help="config file", type=str)
     parser.add_argument("--count", help="count for substitutions", type=int)
     parser.add_argument("--debug", help="debug flag", action="store_true", default=None)
     parser.add_argument("--depth", help="walk depth", type=int)
     parser.add_argument("--disable", help="disable section", action="append")
+    parser.add_argument("--discard", help="discard error codes", action="store_true", default=None)
     parser.add_argument("--dump", help="dump section", action="append")
     parser.add_argument("--dumpall", help="dump all sections", action="store_true", default=None)
     parser.add_argument("--enable", help="enable section", action="append")
@@ -129,6 +129,8 @@ def genParser():
     parser.add_argument("--nohashed", help="do not check hashes of unknown files", action="store_true", default=None)
     parser.add_argument("--noignore", help="ignore ignore options", action="store_true", default=None)
     parser.add_argument("--nomake", help="do not make folders", action="store_true", default=None)
+    parser.add_argument("--preconfig", help="preconfig option", action="append")
+    parser.add_argument("--postconfig", help="postconfig option", action="append")
     parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str)
     parser.add_argument("--py:enable", dest="pyenable", help="key for py:enable", type=str)
     parser.add_argument("--py:makecommand", dest="pymakecommand", help="key for py:makecommand", type=str)
@@ -158,7 +160,7 @@ def sighandler(signum, frame):
     sys.exit()
     return
 
-def waitFutures(verbose, debug, color, colors, invert, futures):
+def waitFutures(verbose, debug, color, colors, discard, invert, futures):
     results = []
     while True:
         nfutures = []
@@ -166,7 +168,7 @@ def waitFutures(verbose, debug, color, colors, invert, futures):
             if future.done():
                 pheader, cheader, ec, out = future.result()
                 if verbose >= 5: display(verbose, color, colors, pheader, cheader, ec, out)
-                results.append((pheader, cheader, ec if not invert else not ec, out))
+                results.append((pheader, cheader, 0 if discard else (ec if not invert else not ec), out))
                 pass
             else: nfutures.append(future)
             continue
@@ -186,13 +188,16 @@ def dispResults(verbose, debug, color, colors, partition, results):
         pass
     return nerrors
 
-def readConfig(configfile, configs=[]):
+def readConfig(configfile, preconfigs=[], postconfigs=[]):
     rc = od.__dict__.copy()
     rc["HOME"] = HOME
-    rc["mycheck_call"] = mycheck_call
-    rc["mycheck_output"] = mycheck_output
+    rc["check_call"] = check_call
+    rc["check_output"] = check_output
+    for config in preconfigs:
+        exec(config, globals(), rc)
+        continue
     if type(configfile) == type("") and os.path.exists(configfile): rc.update(rp.run_path(configfile, rc))
-    for config in configs:
+    for config in postconfigs:
         exec(config, globals(), rc)
         continue
     return rc
@@ -223,11 +228,11 @@ def main():
     fileargs = parser.parse_args(rcarguments)
     chdir = option(cmdargs.chdir)
     color = option(cmdargs.color, optnot(cmdargs.nocolor), fileargs.color, optnot(fileargs.nocolor), True)
-    configs = option(cmdargs.config, [])
     count = option(cmdargs.count, fileargs.count, 10)
     debug = option(cmdargs.debug, fileargs.debug, False)
     depth = option(cmdargs.depth, -1)
     disables = (cmdargs.disable or []) + (fileargs.disable or [])
+    discard = option(cmdargs.discard, False)
     dumps = cmdargs.dump or []
     dumpall = option(cmdargs.dumpall, False)
     enables = (cmdargs.enable or []) + (fileargs.enable or [])
@@ -240,6 +245,8 @@ def main():
     noignore = option(cmdargs.noignore, fileargs.noignore, False)
     ignores = (cmdargs.ignore or []) + (fileargs.ignore or []) if not noignore else []
     make = option(cmdargs.make, optnot(cmdargs.nomake), fileargs.make, optnot(fileargs.nomake), False)
+    preconfigs = option(cmdargs.preconfig, [])
+    postconfigs = option(cmdargs.preconfig, [])
     pyclosebrace = option(cmdargs.pyclosebrace, fileargs.pyclosebrace, "%]")
     pyenable = option(cmdargs.pyenable, fileargs.pyenable, "py:enable")
     pymakecommand = option(cmdargs.pymakecommand, fileargs.pymakecommand, "py:makecommand")
@@ -260,7 +267,7 @@ def main():
         if not os.path.exists(file): error(256 - 1, 'Input file "{file}" does not exist'.format(file=file))
         hd = hl.sha256(open(file).read().encode()).hexdigest()
         if hashed and hd not in rchashes: error(256 - 2, 'Input file "{file}" does not have allowed hash ({hd})'.format(file=file, hd=hd))
-        rc = readConfig(file, configs)
+        rc = readConfig(file, preconfigs, postconfigs)
         for section in rc:
             if section in ["python_path", "futures"]: continue
             rcsection = rc[section]
@@ -286,7 +293,7 @@ def main():
             continue
         return
     
-    rc = readConfig(configfile, configs)
+    rc = readConfig(configfile, preconfigs, postconfigs)
     colors = rc["colors"]
     priorities = {}
     dumpFound = False
@@ -322,7 +329,7 @@ def main():
     for path, section, entry in fileIterate(ignores):
         if not make: continue
         if not entry: entry = tuple()
-        if section not in priorities: error(256 - 5, "No section applies to {section} = {path}".format(section=section, path=path))
+        if section not in priorities: continue
         rcsection = rcPython(verbose, debug, path, rc[section])
         makefunction = makecommand = None
         try: makecommand = rcsection[pymakecommand]
@@ -343,7 +350,7 @@ def main():
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, debug, color, colors, invert, futures)
+    results = waitFutures(verbose, debug, color, colors, discard, invert, futures)
     nerrors = dispResults(verbose, debug, color, colors, "<<< MAKE >>>", results)
     if noop: return nerrors
 
@@ -357,7 +364,9 @@ def main():
         nsep = path.count(os.path.sep)
         if depth >= 0 and nsep >= depth: continue
         if len(path) > 2 and (path[0:2] == "./" or path[0:2] == ".\\"): path = path[2:]
-        if fsection: section = fsection
+        if fsection:
+            section = fsection
+            if section not in priorities: continue
         else:
             maxsection = (0, "")
             for section, priority in priorities.items():
@@ -391,7 +400,7 @@ def main():
             pass
         futures.append(future)
         continue
-    results = waitFutures(verbose, debug, color, colors, invert, futures)
+    results = waitFutures(verbose, debug, color, colors, discard, invert, futures)
 
     nerrors = dispResults(verbose, debug, color, colors, "<<< RESULTS >>>", results)
     if not suppress and verbose >= 1 and nerrors > 0:

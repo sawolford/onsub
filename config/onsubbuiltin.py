@@ -13,10 +13,14 @@ colors = {
 }
 
 def getcwd(path):
-    with pd.pushd(path): return os.getcwd()
-    return
+    try:
+        with pd.pushd(path): return os.getcwd()
+        pass
+    except FileNotFoundError: pass
+    return ""
 
 defdefault = {
+    "onsub": "onsub",
     "cwd": lambda v, d, path: getcwd(path),
 }
 deflinux = {
@@ -48,6 +52,7 @@ gitdefault = {
     "cmd": "git",
     "remote": "{cmd} remote get-url origin",
     "allremote": "{cmd} remote -v",
+    "wcrev": "{cmd} rev-parse --verify --short HEAD",
 }
 gitlinux = {}
 gitwindows = {}
@@ -77,6 +82,7 @@ hgdefault =  {
     "py:priority": hgpriority,
     "py:makecommand": hgmakecommand,
     "cmd": "hg",
+    "wcrev": "{cmd} id -i",
 }
 hglinux = {
     "remote": '{cmd} paths default',
@@ -114,6 +120,7 @@ svndefault = {
     "cmd": "svn",
     "remote": "{cmd} info --show-item url",
     "allremote": "{remote}",
+    "wcrev": "{cmd} info --show-item revision"
 }
 svnlinux = {}
 svnwindows = {}
