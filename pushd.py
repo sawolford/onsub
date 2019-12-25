@@ -7,7 +7,8 @@ class PushdContext:
     def __init__(self, dirname): self.cwd = realpath(dirname)
     def __enter__(self):
         self.owd = getcwd()
-        chdir(self.cwd)
+        try: chdir(self.cwd)
+        except FileNotFoundError: return None
         return self
     def __exit__(self, type, value, tb): chdir(self.owd)
     pass

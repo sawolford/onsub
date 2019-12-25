@@ -38,11 +38,11 @@ def check_call(cmd):
 
 def check_output(cmd, stderr=sp.STDOUT):
     try:
-        out = sp.check_output(cmd, shell=True, stderr=stderr).decode()
+        out = sp.check_output(cmd, shell=True, stderr=stderr).decode("utf-8", "backslashreplace")
         ec = 0
         pass
     except sp.CalledProcessError as exc:
-        out = exc.output.strip().decode()
+        out = exc.output.strip().decode("utf-8", "backslashreplace")
         ec = exc.returncode
         pass
     return ec, out
@@ -105,7 +105,7 @@ def display(verbose, color, colors, pheader, cheader, ec, out):
 def genParser():
     fc = lambda prog: ap.RawDescriptionHelpFormatter(prog, max_help_position=36, width=120)
     parser = ap.ArgumentParser(description="walks filesystem executing arbitrary commands", formatter_class=fc)
-    parser.add_argument("--chdir", help="chdir first", type=str)
+    parser.add_argument("--chdir", help="chdir first", action="append")
     parser.add_argument("--color", help="enables colorized output", action="store_true", default=None)
     parser.add_argument("--comment", help="ignored", type=str)
     parser.add_argument("--configfile", help="config file", type=str)
@@ -226,7 +226,7 @@ def main():
     rcarguments = rc["arguments"] if "arguments" in rc else []
     rchashes = rc["hashes"] if "hashes" in rc else []
     fileargs = parser.parse_args(rcarguments)
-    chdir = option(cmdargs.chdir)
+    chdirs = option(cmdargs.chdir)
     color = option(cmdargs.color, optnot(cmdargs.nocolor), fileargs.color, optnot(fileargs.nocolor), True)
     count = option(cmdargs.count, fileargs.count, 10)
     debug = option(cmdargs.debug, fileargs.debug, False)
@@ -260,165 +260,174 @@ def main():
     workers = option(cmdargs.workers, fileargs.workers, mp.cpu_count())
     rest = cmdargs.rest
     noop = True if not dumpall and len(dumps) == 0 and len(rest) < 1 else False
-    if chdir: os.chdir(chdir)
+    if not chdirs: chdirs = [ "." ]
 
-    paths = {}
-    for file in files:
-        if not os.path.exists(file): error(256 - 1, 'Input file "{file}" does not exist'.format(file=file))
-        hd = hl.sha256(open(file).read().encode()).hexdigest()
-        if hashed and hd not in rchashes: error(256 - 2, 'Input file "{file}" does not have allowed hash ({hd})'.format(file=file, hd=hd))
-        rc = readConfig(file, preconfigs, postconfigs)
-        for section in rc:
-            if section in ["python_path", "futures"]: continue
-            rcsection = rc[section]
-            if type(rcsection) != type([]): continue
-            for path in rcsection:
-                paths.setdefault(section, []).append(path)
+    nerrors = 0
+    for chdir in chdirs:
+        with pd.pushd(chdir) as ctx:
+            if ctx is None: error(256 - 11, 'Could not chdir to "{chdir}".'.format(chdir=chdir))
+            paths = {}
+            for file in files:
+                if not os.path.exists(file): error(256 - 1, 'Input file "{file}" does not exist'.format(file=file))
+                hd = hl.sha256(open(file).read().encode()).hexdigest()
+                if hashed and hd not in rchashes: error(256 - 2, 'Input file "{file}" does not have allowed hash ({hd})'.format(file=file, hd=hd))
+                rc = readConfig(file, preconfigs, postconfigs)
+                for section in rc:
+                    if section in ["python_path", "futures"]: continue
+                    rcsection = rc[section]
+                    if type(rcsection) != type([]): continue
+                    for path in rcsection:
+                        paths.setdefault(section, []).append(path)
+                        continue
+                    continue
                 continue
-            continue
-        continue
-    
 
-    def pathIterate(ignores):
-        for root, dirs, files in os.walk(".", followlinks=True, topdown=True):
-            dirs[:] = [d for d in dirs if d not in ignores]
-            yield root, None, None
-        return
-    def fileIterate(ignores, paths=paths):
-        for section in paths:
-            for entry in paths[section]:
-                if type(entry) == type(""): yield entry, section, None
-                else: yield entry[0], section, entry[1:]
+            def pathIterate(ignores):
+                for root, dirs, files in os.walk(".", followlinks=True, topdown=True):
+                    dirs[:] = [d for d in dirs if d not in ignores]
+                    yield root, None, None
+                return
+            def fileIterate(ignores, paths=paths):
+                for section in paths:
+                    for entry in paths[section]:
+                        if type(entry) == type(""): yield entry, section, None
+                        else: yield entry[0], section, entry[1:]
+                        continue
+                    continue
+                return
+
+            rc = readConfig(configfile, preconfigs, postconfigs)
+            colors = rc["colors"]
+            priorities = {}
+            dumpFound = False
+            for section, vv in rc.items():
+                if section == "colors" or section == "__builtins__": continue
+                if type(rc[section]) != type({}): continue
+                if dumpall or section in dumps:
+                    dumpFound = True
+                    rcsection = rc[section]
+                    print("{section} = {{".format(section=section))
+                    for kk, vv in rcsection.items():
+                        print("\t{kk} = {vv}".format(kk=kk, vv=vv))
+                        continue
+                    print("}")
+                    continue
+                enable = section in enables
+                disable = section in disables
+                rcsection = rc[section]
+                try: defenable = rcsection[pyenable]
+                except KeyError: defenable = False
+                if ((noenable or not defenable) and not enable) or disable: continue
+                try: priority = rcsection[pypriority]
+                except KeyError: error(256 - 3, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
+                priorities[section] = priority
                 continue
-            continue
-        return
-    
-    rc = readConfig(configfile, preconfigs, postconfigs)
-    colors = rc["colors"]
-    priorities = {}
-    dumpFound = False
-    for section, vv in rc.items():
-        if section == "colors" or section == "__builtins__": continue
-        if type(rc[section]) != type({}): continue
-        if dumpall or section in dumps:
-            dumpFound = True
-            rcsection = rc[section]
-            print("{section} = {{".format(section=section))
-            for kk, vv in rcsection.items():
-                print("\t{kk} = {vv}".format(kk=kk, vv=vv))
-                continue
-            print("}")
-            continue
-        enable = section in enables
-        disable = section in disables
-        rcsection = rc[section]
-        try: defenable = rcsection[pyenable]
-        except KeyError: defenable = False
-        if ((noenable or not defenable) and not enable) or disable: continue
-        try: priority = rcsection[pypriority]
-        except KeyError: error(256 - 3, 'No {pypriority} key in {section} section'.format(pypriority=pypriority, section=section))
-        priorities[section] = priority
-        continue
-    if len(dumps) > 0:
-        if not dumpFound: error(256 - 4, "No matching sections found")
-        return 0
+            if len(dumps) > 0:
+                if not dumpFound: error(256 - 4, "No matching sections found")
+                return 0
 
-    pool = pb.ProcessPool(max_workers=workers)
-    signal.signal(signal.SIGINT, sighandler)
+            pool = pb.ProcessPool(max_workers=workers)
+            signal.signal(signal.SIGINT, sighandler)
 
-    for path, section, entry in fileIterate(ignores):
-        if not make: continue
-        if not entry: entry = tuple()
-        if section not in priorities: continue
-        rcsection = rcPython(verbose, debug, path, rc[section])
-        makefunction = makecommand = None
-        try: makecommand = rcsection[pymakecommand]
-        except KeyError:
-            try: makefunction = rcsection[pymakefunction]
-            except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
-            pass
-        time.sleep(sleepmake)
-        if makecommand:
-            cmd = makecommand(verbose, debug, path, *entry)
-            if not cmd: continue
-            cmd = substitute(cmd, rcsection, pyopenbrace, pyclosebrace, count)
-            future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
-            pass
-        else:
-            ec, out = makefunction(verbose, debug, path, noexec, *entry)
-            future = pyfuncfuture(path, makefunction.__name__, ec, out)
-            pass
-        futures.append(future)
-        continue
-    results = waitFutures(verbose, debug, color, colors, discard, invert, futures)
-    nerrors = dispResults(verbose, debug, color, colors, "<<< MAKE >>>", results)
-    if noop: return nerrors
-
-    root = os.getcwd()
-    futures = []
-    errors = []
-    if len(files) > 0: cmdIterate = fileIterate
-    else: cmdIterate = pathIterate
-    for path, fsection, _ in cmdIterate(ignores):
-        if not os.path.isdir(path): error(256 - 7, 'Folder "{path}" does not exist.'.format(path=path))
-        nsep = path.count(os.path.sep)
-        if depth >= 0 and nsep >= depth: continue
-        if len(path) > 2 and (path[0:2] == "./" or path[0:2] == ".\\"): path = path[2:]
-        if fsection:
-            section = fsection
-            if section not in priorities: continue
-        else:
-            maxsection = (0, "")
-            for section, priority in priorities.items():
-                with pd.pushd(path): pvalue = priority(verbose, debug, path)
-                if pvalue > maxsection[0]:
-                    maxsection = (pvalue, section)
+            for path, section, entry in fileIterate(ignores):
+                if not make: continue
+                if not entry: entry = tuple()
+                if section not in priorities: continue
+                rcsection = rcPython(verbose, debug, path, rc[section])
+                makefunction = makecommand = None
+                try: makecommand = rcsection[pymakecommand]
+                except KeyError:
+                    try: makefunction = rcsection[pymakefunction]
+                    except: error(256 - 6, 'No "{pymakecommand}" or "{pymakefunction}" key in section {section}'.format(pymakecommand=pymakecommand, pymakefunction=pymakefunction, section=section))
                     pass
+                time.sleep(sleepmake)
+                if makecommand:
+                    cmd = makecommand(verbose, debug, path, *entry)
+                    if not cmd: continue
+                    cmd = substitute(cmd, rcsection, pyopenbrace, pyclosebrace, count)
+                    future = pool.schedule(work, args=[path, cmd, section, verbose, debug, noexec])
+                    pass
+                else:
+                    ec, out = makefunction(verbose, debug, path, noexec, *entry)
+                    future = pyfuncfuture(path, makefunction.__name__, ec, out)
+                    pass
+                futures.append(future)
                 continue
-            if maxsection[0] == 0: continue
-            section = maxsection[1]
-            pass
-        rcsection = rcPython(verbose, debug, path, rc[section])
-        time.sleep(sleepcommand)
-        if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
-            cmd = rest[0]
-            rem = rest[1:]
-            pheader = "{path} ({section})".format(path=path, section=section)
-            cheader = "{cmd}".format(cmd=cmd)
-            try: pyfunc = rcsection[cmd]
-            except KeyError: error(256 - 8, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
-            with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
-            future = pyfuncfuture(pheader, cheader, ec, out)
-            if verbose >= 6: display(verbose, color, colors, pheader, cheader, ec, out)
-            pass
-        else:
-            command = rest[0]
-            if command[0] == "\\": command = command[1:]
-            elif command in rcsection: command = "{{{command}}}".format(command=command)
-            cmd = substitute(" ".join([command] + rest[1:]), rcsection, pyopenbrace, pyclosebrace, count)
-            future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
-            pass
-        futures.append(future)
-        continue
-    results = waitFutures(verbose, debug, color, colors, discard, invert, futures)
+            results = waitFutures(verbose, debug, color, colors, discard, invert, futures)
+            futures = []
+            nerrors += dispResults(verbose, debug, color, colors, "<<< MAKE >>>", results)
+            if noop: return nerrors
 
-    nerrors = dispResults(verbose, debug, color, colors, "<<< RESULTS >>>", results)
-    if not suppress and verbose >= 1 and nerrors > 0:
-        print(tocolor(color, colors, "partition") + "<<< ERRORS >>>")
-        for pheader, cheader, ec, out in results:
-            if not ec: continue
-            print(tocolor(color, colors, "errorcode") + "({ec})".format(ec=ec), end="")
-            print(" ", end="")
-            print(tocolor(color, colors, "path") + pheader, end="")
-            print(" ", end="")
-            print(tocolor(color, colors, "command") + cheader)
-            if len(out): print(tocolor(color, colors, "error") + out.strip())
-            continue
-        pass
+            root = os.getcwd()
+            futures = []
+            errors = []
+            if len(files) > 0: cmdIterate = fileIterate
+            else: cmdIterate = pathIterate
+            for path, fsection, _ in cmdIterate(ignores):
+                if not os.path.isdir(path): error(256 - 7, 'Folder "{path}" does not exist.'.format(path=path))
+                nsep = path.count(os.path.sep)
+                if depth >= 0 and nsep >= depth: continue
+                if len(path) > 2 and (path[0:2] == "./" or path[0:2] == ".\\"): path = path[2:]
+                if fsection:
+                    section = fsection
+                    if section not in priorities: continue
+                    pass
+                else:
+                    maxsection = (0, "")
+                    for section, priority in priorities.items():
+                        with pd.pushd(path): pvalue = priority(verbose, debug, path)
+                        if pvalue > maxsection[0]:
+                            maxsection = (pvalue, section)
+                            pass
+                        continue
+                    if maxsection[0] == 0: continue
+                    section = maxsection[1]
+                    pass
+                rcsection = rcPython(verbose, debug, path, rc[section])
+                time.sleep(sleepcommand)
+                if len(rest) > 0 and len(rest[0]) > 2 and rest[0][:3] == "py:":
+                    cmd = rest[0]
+                    rem = rest[1:]
+                    pheader = "{path} ({section})".format(path=path, section=section)
+                    cheader = "{cmd}".format(cmd=cmd)
+                    try: pyfunc = rcsection[cmd]
+                    except KeyError: error(256 - 8, 'No "{cmd}" key in section {section}'.format(cmd=cmd, section=section))
+                    with pd.pushd(path): ec, out = pyfunc(verbose, debug, path, noexec, *rem)
+                    future = pyfuncfuture(pheader, cheader, ec, out)
+                    if verbose >= 6: display(verbose, color, colors, pheader, cheader, ec, out)
+                    pass
+                else:
+                    command = rest[0]
+                    if command[0] == "\\": command = command[1:]
+                    elif command in rcsection: command = "{{{command}}}".format(command=command)
+                    cmd = substitute(" ".join([command] + rest[1:]), rcsection, pyopenbrace, pyclosebrace, count)
+                    future = pool.schedule(cdwork, args=[path, cmd, section, verbose, debug, noexec, path])
+                    pass
+                futures.append(future)
+                continue
+            results = waitFutures(verbose, debug, color, colors, discard, invert, futures)
+            futures = []
+
+            nerrors += dispResults(verbose, debug, color, colors, "<<< RESULTS >>>", results)
+            if not suppress and verbose >= 1 and nerrors > 0:
+                print(tocolor(color, colors, "partition") + "<<< ERRORS >>>")
+                for pheader, cheader, ec, out in results:
+                    if not ec: continue
+                    print(tocolor(color, colors, "errorcode") + "({ec})".format(ec=ec), end="")
+                    print(" ", end="")
+                    print(tocolor(color, colors, "path") + pheader, end="")
+                    print(" ", end="")
+                    print(tocolor(color, colors, "command") + cheader)
+                    if len(out): print(tocolor(color, colors, "error") + out.strip())
+                    continue
+                pass
+            pass
+        continue
+
     return nerrors
 
 if __name__ == "__main__":
     mp.freeze_support()
     rv = main()
-    if rv >= 245: print("Errors exceed 245", file=sys.stderr)
+    if rv >= 244: print("Errors exceed 244", file=sys.stderr)
     sys.exit(rv)

@@ -3,6 +3,6 @@ import sys
 import onsub
 if __name__ == "__main__":
     rv = onsub.main()
-    if rv >= 245: print("Errors exceed 245", file=sys.stderr)
+    if rv >= 244: print("Errors exceed 244", file=sys.stderr)
     sys.exit(rv)
     pass
