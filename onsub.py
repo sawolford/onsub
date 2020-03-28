@@ -129,6 +129,7 @@ def genParser():
     parser.add_argument("--nohashed", help="do not check hashes of unknown files", action="store_true", default=None)
     parser.add_argument("--noignore", help="ignore ignore options", action="store_true", default=None)
     parser.add_argument("--nomake", help="do not make folders", action="store_true", default=None)
+    parser.add_argument("--norecurse", help="do not recurse into subfolders", action="store_true", default=None)
     parser.add_argument("--postconfig", help="postconfig option", action="append")
     parser.add_argument("--preconfig", help="preconfig option", action="append")
     parser.add_argument("--py:closebrace", dest="pyclosebrace", help="key for py:closebrace", type=str)
@@ -137,6 +138,7 @@ def genParser():
     parser.add_argument("--py:makefunction", dest="pymakefunction", help="key for py:makefunction", type=str)
     parser.add_argument("--py:openbrace", dest="pyopenbrace", help="key for py:openbrace", type=str)
     parser.add_argument("--py:priority", dest="pypriority", help="key for py:priority", type=str)
+    parser.add_argument("--recurse", help="recurse into subfolders", action="store_true", default=None)
     parser.add_argument("--sleepcommand", help="sleep between command calls", type=float)
     parser.add_argument("--sleepmake", help="sleep between make calls", type=float)
     parser.add_argument("--suppress", help="suppress repeated error output", action="store_true", default=None)
@@ -253,6 +255,7 @@ def main():
     pymakefunction = option(cmdargs.pymakefunction, fileargs.pymakefunction, "py:makefunction")
     pyopenbrace = option(cmdargs.pyopenbrace, fileargs.pyopenbrace, "%[")
     pypriority = option(cmdargs.pypriority, fileargs.pypriority, "py:priority")
+    recurse = option(cmdargs.recurse, optnot(cmdargs.norecurse), fileargs.recurse, optnot(fileargs.norecurse), True)
     sleepmake = option(cmdargs.sleepmake, fileargs.sleepmake, 0.1)
     sleepcommand = option(cmdargs.sleepcommand, fileargs.sleepcommand, 0)
     suppress = option(cmdargs.suppress, fileargs.suppress, False)
@@ -282,11 +285,16 @@ def main():
                     continue
                 continue
 
-            def pathIterate(ignores):
-                for root, dirs, files in os.walk(".", followlinks=True, topdown=True):
-                    dirs[:] = [d for d in dirs if d not in ignores]
-                    yield root, None, None
-                return
+            if recurse:
+                def pathIterate(ignores):
+                    for root, dirs, files in os.walk(".", followlinks=True, topdown=True):
+                        dirs[:] = [d for d in dirs if d not in ignores]
+                        yield root, None, None
+                    return
+                pass
+            else:
+                def pathIterate(ignores): yield ".", None, None
+                pass
             def fileIterate(ignores, paths=paths):
                 for section in paths:
                     for entry in paths[section]:
