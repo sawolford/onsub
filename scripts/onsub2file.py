@@ -3,9 +3,12 @@ import re, sys
 import subprocess as sp
 sectre = re.compile("(.*) \((.+)\)")
 args = " ".join(sys.argv[1:])
-cmd = 'onsub --nocolor --verbose 3 ' + args + " {remote}"
+cmd = 'onsub --nocolor --verbose 3 --discard' + args + " {remote}"
 try: result = sp.check_output(cmd, shell=True, stderr=sp.DEVNULL).decode()
-except sp.CalledProcessError as exc: result = []
+except sp.CalledProcessError as exc:
+    print(exc)
+    sys.exit(1)
+    pass
 sections = {}
 folder = section = repo = None
 for line in result.splitlines():
